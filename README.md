@@ -23,6 +23,7 @@
 * `main.py` — основной файл проекта: загрузка данных, обучение модели и оценка результатов.
 * `requirements.txt` — список библиотек, необходимых для работы проекта.
 * `.gitignore` — файл, скрывающий лишние системные файлы от Git.
+* `app.py` — файл для запуска интерактивного веб-интерфейса через Streamlit.
 
 ## Визуализация результатов
 ![Результаты модели](result_plot.png)
@@ -35,3 +36,7 @@
    ```bash
    git clone https://github.com/MadCompany-WT/House-price-prediction-model.git
    cd House-price-prediction-model
+   
+3. **Запустите веб-приложение (интерфейс):**
+   ```bash
+   streamlit run app.py
