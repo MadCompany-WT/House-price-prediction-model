@@ -19,7 +19,7 @@ st.markdown("""
 # Модельді жүктеу
 model = joblib.load('models/house_price_model.pkl')
 
-st.title("🌙 AI Qyzylorda Realtor: Сыр өңірі бойынша сараптама")
+st.title("🌙 Qyzylorda House Prediction: Сыр өңірі бойынша сараптама")
 st.write("Қызылорда қаласының нарығына бейімделген интеллектуалды бағалау жүйесі.")
 
 # 2. Мәліметтерді енгізу
@@ -107,7 +107,7 @@ with col2:
         st.balloons()
     else:
         st.info("Сол жақтағы мәліметтерді толтырып, 'Нәтижені есептеу' батырмасын басыңыз.")
-        st.image("https://upload.wikimedia.org/wikipedia/commons/e/ea/Qyzylorda_city.jpg", caption="Қызылорда қаласы")
+
 
 st.sidebar.markdown("---")
 st.sidebar.write("Автор: MadCompany-WT")
