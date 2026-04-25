@@ -2,50 +2,84 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-# Настройка страницы
-st.set_page_config(page_title="Прогноз цен на жилье", page_icon="🏠")
+# Интерфейс баптаулары
+st.set_page_config(page_title="Үй бағасын болжау", page_icon="🏠")
 
-st.title("🏠 Калькулятор стоимости жилья (California)")
-st.write("Передвигайте ползунки слева, чтобы предсказать цену недвижимости.")
+st.title("🏠 Тұрғын үй құнын есептеу (Қазақстан)")
+st.write("Мәліметтерді толтырып, үйдің болжамды бағасын теңгемен біліңіз.")
 
+# Модельді жүктеу
+model = joblib.load('models/house_price_model.pkl')
 
-# Загрузка модели
-@st.cache_resource
-def load_model():
-    return joblib.load('models/house_price_model.pkl')
+# Слайдерлер (Қолданушыға түсінікті параметрлер)
+st.sidebar.header("Үй параметрлері:")
 
+# 1. Айлық табыс (Теңгемен)
+monthly_income = st.sidebar.number_input('Отбасының айлық табысы (теңге)', min_value=100000, max_value=10000000,
+                                         value=650000, step=50000)
 
-model = load_model()
+# 2. Квадрат метр
+area = st.sidebar.slider('Үйдің ауданы (квадрат метр)', 20, 300, 80)
 
-# Настройка боковой панели (ползунки)
-st.sidebar.header("Параметры дома:")
+# 3. Бөлмелер саны
+rooms = st.sidebar.slider('Жалпы бөлме саны', 1, 10, 4)
+bedrooms = st.sidebar.slider('Жатын бөлме саны', 1, 5, 2)
 
+# 4. Адам саны
+household_size = st.sidebar.slider('Үйде тұратын адам саны', 1, 15, 5)
 
-def user_input_features():
-    med_inc = st.sidebar.slider('Средний доход в районе ($)', 0.5, 15.0, 3.5)
-    house_age = st.sidebar.slider('Возраст дома (лет)', 1, 52, 28)
-    ave_rooms = st.sidebar.slider('Среднее кол-во комнат', 1, 10, 5)
-    ave_bedrms = st.sidebar.slider('Среднее кол-во спален', 1, 5, 1)
-    pop = st.sidebar.slider('Население района', 3, 35000, 1400)
-    occup = st.sidebar.slider('Жителей в одном доме', 1, 10, 3)
-    lat = st.sidebar.slider('Широта (Latitude)', 32.5, 42.0, 35.6)
-    long = st.sidebar.slider('Долгота (Longitude)', -124.3, -114.3, -119.5)
+# 5. Үйдің жасы
+house_age = st.sidebar.slider('Үйдің жасы (жыл)', 1, 60, 15)
 
-    data = {
-        'MedInc': med_inc, 'HouseAge': house_age, 'AveRooms': ave_rooms,
-        'AveBedrms': ave_bedrms, 'Population': pop, 'AveOccup': occup,
-        'Latitude': lat, 'Longitude': long
-    }
-    return pd.DataFrame(data, index=[0])
+# --- МАТЕМАТИКАЛЫҚ АЙНАЛДЫРУ ---
+# 1$ = 450тг деп алсақ:
+# Модель табысты "10 000$" бірлігінде күтеді
+yearly_income_usd = (monthly_income * 12) / 500
+med_inc_scaled = yearly_income_usd / 10000
 
+# Квадрат метрді модельдің "AveRooms" бағанына бейімдеу
+# (орташа есеппен 1 бөлме 25-30 кв.м)
+ave_rooms = area / 8
 
-df_input = user_input_features()
+# Координаттарды орташа мәнде жасырын қалдырамыз (Калифорния үшін стандартты)
+lat = 35.6
+long = -119.5
+pop = 1500  # Орташа халық саны
 
-# Кнопка расчета
-if st.button('Рассчитать цену'):
-    prediction = model.predict(df_input)
-    # Цены в датасете в сотнях тысяч долларов
-    final_price = prediction[0] * 100000
+# Модельге жіберілетін мәліметтер
+input_data = pd.DataFrame({
+    'MedInc': [med_inc_scaled],
+    'HouseAge': [house_age],
+    'AveRooms': [ave_rooms],
+    'AveBedrms': [bedrooms / 1.5],  # коэффициент
+    'Population': [pop],
+    'AveOccup': [household_size],
+    'Latitude': [lat],
+    'Longitude': [long]
+})
 
-    st.success(f"### Примерная стоимость: ${final_price:,.0f}")
-    st.info("Это предсказание на основе обученной модели Random Forest.")
+# Есептеу батырмасы
+if st.button('Бағаны есептеу'):
+    # Модель болжамы (нәтиже 100 000$ бірлігінде шығады)
+    raw_prediction = model.predict(input_data)
+
+    # Теңгеге айналдыру: нәтиже * 100,000 * 450
+    final_price_kzt = raw_prediction[0] * 100000 * 500
+
+    # Нақтырақ болуы үшін ауданға байланысты түзету (шартты)
+    # Егер 4 бөлмелі үй болса, баға тым арзан болмауы керек
+    if final_price_kzt < 15000000:
+        final_price_kzt *= 1.5
+
+        multiplier = 0.8
+
+        final_price_kzt = final_price_kzt * multiplier
+
+    st.success(f"### Үйдің болжамды бағасы: {final_price_kzt:,.0f} теңге")
+
+    st.info(f"""
+    **Талдау:**
+    - Айлық табыс: {monthly_income:,.0f} ₸
+    - Үй ауданы: {area} м²
+    - Бөлме саны: {rooms}
+    """)
