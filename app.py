@@ -2,38 +2,41 @@ import streamlit as st
 import pandas as pd
 import joblib
 import plotly.express as px
-import plotly.graph_objects as go
+import numpy as np
 
-# 1. Бет баптаулары мен стильдері
-st.set_page_config(page_title="Qyzylorda Smart Property AI", page_icon="🏠", layout="wide")
+# 1. Бет баптаулары мен ТҮЗЕТІЛГЕН СТИЛЬДЕР (Dark Mode)
+st.set_page_config(page_title="Qyzylorda Property & Currency AI", page_icon="💰", layout="wide")
 
 st.markdown("""
     <style>
-    .main { background-color: #f4f7f6; }
-    .district-card {
-        background: white;
-        padding: 22px; 
-        border-radius: 18px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        border-top: 6px solid #00d4ff;
-        text-align: center;
-        transition: 0.3s;
-        margin-bottom: 15px;
+    /* Негізгі фон мен мәтін түсі */
+    .main { background-color: #0e1117; color: #ffffff; }
+
+    /* Sidebar (сол жақ панель) дизайны */
+    [data-testid="stSidebar"] { background-color: #161b22; border-right: 1px solid #30363d; }
+    [data-testid="stSidebar"] label { color: #ffffff !important; font-weight: 600; font-size: 16px; }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2 { color: #00d4ff !important; }
+
+    /* Негізгі беттегі тақырыптар */
+    h1, h2, h3 { color: #00d4ff !important; font-family: 'Inter', sans-serif; }
+    p, span, label { color: #e6edf3 !important; }
+
+    /* Метрикалар (карточкалар) */
+    div[data-testid="stMetric"] {
+        background-color: #1c2128;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 20px;
     }
-    .district-card:hover { transform: translateY(-8px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
-    .district-card h4 {
-        color: #000000 !important;
-        font-weight: bold !important;
-        margin-top: 10px;
-        font-size: 19px;
-    }
-    .price-tag { color: #2e7d32; font-weight: bold; font-size: 22px; }
-    .m2-price { color: #666666; font-size: 13px; }
+    div[data-testid="stMetricValue"] { color: #00d4ff !important; font-size: 32px !important; }
+
+    /* Input өрістерін реттеу */
+    input { color: white !important; }
+    .stNumberInput div div input { background-color: #0d1117 !important; border: 1px solid #30363d !important; }
     </style>
     """, unsafe_allow_html=True)
 
 
-# Модельді жүктеу
 @st.cache_resource
 def load_model():
     return joblib.load('models/house_price_model.pkl')
@@ -41,113 +44,114 @@ def load_model():
 
 model = load_model()
 
-# 2. Sidebar: Интеллектуалды басқару панелі
+# 2. Sidebar: ПАРАМЕТРЛЕР (Динамикалық логика)
 with st.sidebar:
-    st.header("⚙️ Параметрлер")
-    st.divider()
+    st.header("🏠 Үй параметрлері")
+    is_house = st.checkbox("🏡 Жер үй", value=False)
 
-    # ТҮРІН ТАҢДАУ (ГАЛОЧКА)
-    is_house = st.checkbox("🏡 Жер үй (Жер учаскесімен)", value=False)
-
-    area = st.slider("📐 Үй ауданы (м²)", 20, 400, 85)
-    rooms = st.slider("🚪 Бөлме саны", 1, 8, 3)
+    area = st.number_input("Үй ауданы (м²)", min_value=20, max_value=500, value=85)
+    rooms = st.slider("Бөлме саны", 1, 10, 3)
 
     if is_house:
-        # Жер үйге арналған гектар (сотка)
-        land_size = st.slider("🌱 Жер көлемі (Гектармен)", 0.02, 1.0, 0.06, step=0.01)
-        st.caption(f"Бұл шамамен {land_size * 100:.1f} сотка")
-        floor_val = 1  # Жер үй әрқашан 1-қабат деп алынады
+        # ЖЕР ҮЙГЕ ТӘН ПАРАМЕТРЛЕР
+        land_sotka = st.slider("🌱 Жер көлемі (сотка)", 1, 20, 6)
+        house_floors = st.selectbox("🏘️ Үй неше қабатты?", [1, 2, 3], index=0)
+        age = st.slider("⏳ Салынған жылы (жасы)", 1, 60, 10)
+        floor_impact = 1.0  # Жер үйде қабат әсері жоқ
     else:
-        # Пәтерге арналған қабат (1-5)
-        floor_val = st.select_slider("🏢 Қай қабатта? (Макс 5)", options=[1, 2, 3, 4, 5], value=3)
-        land_size = 0
+        # ПӘТЕРГЕ ТӘН ПАРАМЕТРЛЕР
+        floor_level = st.select_slider("🏢 Пәтер нешінші қабатта?", options=[1, 2, 3, 4, 5], value=3)
+        age = st.slider("⏳ Үйдің жасы (жыл)", 1, 60, 20)
+        # Қабат логикасы: 2,3,4 - алтын қабаттар
+        floor_map = {1: 0.9, 2: 1.1, 3: 1.15, 4: 1.1, 5: 0.85}
+        floor_impact = floor_map[floor_level]
+        land_sotka = 0
+        house_floors = 1
 
-    income = st.number_input("💰 Айлық табыс (₸)", value=650000, step=50000)
+    repair_map = {"Черновой": 0.8, "Орташа": 1.0, "Еуро": 1.3}
+    repair = st.selectbox("🛠 Жөндеу", list(repair_map.keys()), index=1)
+
     st.divider()
-    st.write(f"Таңдалды: **{'Жер үй' if is_house else 'Пәтер'}**")
+    st.header("📈 Базалық экономика")
+    current_usd = st.number_input("Ағымдағы доллар курсы (₸)", value=480)
+    income = st.number_input("Айлық табыс (₸)", value=650000)
 
 
-districts = {
-    "Аудан": ["Орталық", "Сырдария", "Арай", "Шұғыла", "Титов", "КБИ", "Сельмаш", "Ақмешіт"],
-    "Коэф": [1.35, 1.28, 1.15, 1.12, 0.85, 0.92, 0.88, 1.10],
-    "Icon": ["🏛️", "🏙️", "🏡", "🌇", "🏭", "🚉", "🏗️", "🆕"]
-}
-df_dist = pd.DataFrame(districts)
-
-
-def calc_smart_price(row):
-    USD_KZT = 380
-    MULTIPLIER = 0.9
+# 3. Есептеу функциясы (Доллар мен Пайыздық өсімді ескере отырып)
+def get_price(usd_rate, dist_mult=1.0):
+    MULTIPLIER = 0.8
     QYZ_INDEX = 0.4
 
-    # Модельге дайындық
-    med_inc = (income * 12) / USD_KZT / 10000
-    input_data = pd.DataFrame({
-        'MedInc': [med_inc], 'HouseAge': [15], 'AveRooms': [area / 25],
+    med_inc = (income * 12) / usd_rate / 10000
+    input_df = pd.DataFrame({
+        'MedInc': [med_inc], 'HouseAge': [age], 'AveRooms': [area / 25],
         'AveBedrms': [1.2], 'Population': [1500], 'AveOccup': [4],
         'Latitude': [34.0], 'Longitude': [-118.0]
     })
 
-    raw_pred = model.predict(input_data)[0]
-    base_price = raw_pred * 100000 * USD_KZT * MULTIPLIER * row['Коэф'] * QYZ_INDEX
+    raw_pred = model.predict(input_df)[0]
+    # Негізгі баға есебі
+    price = raw_pred * 100000 * usd_rate * MULTIPLIER * dist_mult * QYZ_INDEX * repair_map[repair] * floor_impact
 
-    # ЖЕР ҮЙ мен ПӘТЕР логикасы
+    # Егер жер үй болса, жердің және қабаттың құны
     if is_house:
-        # Жер үй: Гектар үшін баға қосылады (1 сотка ~ 1.5 млн тг орташа)
-        land_value = land_size * 100 * 1500000
-        final_price = base_price + land_value
-    else:
-        # Пәтер: Қабат коэффициенті (2,3,4-қабаттар +10%)
-        if floor_val in [2, 3, 4]:
-            final_price = base_price * 1.1
-        else:
-            final_price = base_price * 0.9
+        price += (land_sotka * 1500000)  # 1 сотка ~ 1.5 млн
+        if house_floors > 1: price *= (1 + (house_floors * 0.1))
 
-    return int(final_price)
+    return int(price)
 
 
-df_dist['Баға'] = df_dist.apply(calc_smart_price, axis=1)
+districts = {"Орталық": 1.35, "Сырдария": 1.28, "Сол Жағалау": 1.32, "Арай": 1.15, "Титов": 0.85}
 
-# 4. Негізгі Бөлім
-st.title("🏢 AI Qyzylorda Property Expert")
-st.write(f"Қазіргі таңдау: **{area} м², {rooms} бөлмелі {'Жер үй' if is_house else 'Пәтер'}**")
+# 4. НЕГІЗГІ БЕТ: Валюталық және мүліктік талдау
+st.title("💰 Qyzylorda Property & Currency AI")
+st.write(
+    f"Қазіргі таңдау: **{area} м², {rooms} бөлмелі {'жер үй (' + str(land_sotka) + ' сот.)' if is_house else 'пәтер (' + str(floor_level) + '-қабат)'}**")
 
-# Карточкаларды шығару
-for i in range(0, len(df_dist), 4):
-    cols = st.columns(4)
-    for j in range(4):
-        if i + j < len(df_dist):
-            row = df_dist.iloc[i + j]
-            with cols[j]:
-                st.markdown(f"""
-                <div class="district-card">
-                    <div style="font-size: 45px; margin-bottom: 10px;">{row['Icon']}</div>
-                    <h4>{row['Аудан']}</h4>
-                    <p class="price-tag">{row['Баға']:,} ₸</p>
-                    <p class="m2-price">{int(row['Баға'] / area):,} ₸/м²</p>
-                </div>
-                """, unsafe_allow_html=True)
-
-# 5. Аналитика
 st.divider()
-col_l, col_r = st.columns([1.5, 1])
+col1, col2 = st.columns([1, 1.5])
 
-with col_l:
-    st.subheader("📊 Бағаларды салыстыру")
-    fig = px.bar(df_dist, x='Аудан', y='Баға', color='Баға', color_continuous_scale='Blues')
-    fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-    st.plotly_chart(fig, use_container_width=True)
+with col1:
+    st.subheader("🚀 Валюталық шок симуляторы")
+    # Доллардың болашақтағы ықтимал курсы
+    future_usd = st.slider("Егер доллар осы бағаға көтерілсе (₸):", 400, 800, 550)
 
-with col_r:
-    st.subheader("💡 Таңдау сипаттамасы")
-    if is_house:
-        st.success(
-            f"Сіз **{land_size * 100:.0f} сотка** жері бар жеке үйді таңдадыңыз. Жер үйлердің бағасы учаске көлеміне тікелей байланысты.")
-    else:
-        status = "Алтын қабат" if floor_val in [2, 3, 4] else "Шеткі қабат"
-        st.info(f"Сіз **{floor_val}-қабаттағы** пәтерді таңдадыңыз. Қызылордада бұл **{status}** болып есептеледі.")
+    p_now = get_price(current_usd, districts["Орталық"])
+    p_future = get_price(future_usd, districts["Орталық"])
 
-    avg = df_dist['Баға'].mean()
-    st.write(f"**Қала бойынша орташа баға:** {int(avg):,} ₸")
+    # ПАЙЫЗДЫҚ ӨСІМ
+    perc_increase = ((p_future - p_now) / p_now) * 100
 
-# st.balloons() - Алып тасталды
+    st.metric("Болжамды жаңа баға", f"{p_future:,} ₸", delta=f"+{int(perc_increase)}% өсім")
+    st.info(f"Доллар **{future_usd - current_usd} ₸**-ге өссе, үй бағасы **{int(perc_increase)}%**-ға қымбаттайды.")
+
+with col2:
+    st.subheader("📊 Курсқа тәуелділік графигі")
+    usd_range = np.arange(400, 801, 20)
+    prices_range = [get_price(u, districts["Орталық"]) for u in usd_range]
+
+    fig_line = px.line(x=usd_range, y=prices_range,
+                       labels={'x': 'Доллар курсы (₸)', 'y': 'Үй бағасы (₸)'},
+                       template="plotly_dark")
+    fig_line.add_vline(x=current_usd, line_dash="dash", line_color="red", annotation_text="Ағымдағы")
+    st.plotly_chart(fig_line, use_container_width=True)
+
+# 5. Аудандарға әсері
+st.divider()
+st.subheader(f"🏘️ Аудандардағы баға өзгерісі ({future_usd} ₸ курсымен)")
+
+cols = st.columns(len(districts))
+for i, (name, mult) in enumerate(districts.items()):
+    with cols[i]:
+        new_p = get_price(future_usd, mult)
+        old_p = get_price(current_usd, mult)
+        st.metric(name, f"{int(new_p / 1e6)} млн ₸", f"+{int((new_p - old_p) / 1e6)} млн")
+
+# 6. Қорытынды
+st.divider()
+st.subheader("🧠 AI Аналитика")
+if perc_increase > 15:
+    st.error(
+        f"⚠️ **Ескерту:** Валюта бағамының өсуі нарыққа үлкен қысым береді. {area} м² {'үй' if is_house else 'пәтер'} үшін баға {int(perc_increase)}%-ға қымбаттауы мүмкін.")
+else:
+    st.success("✅ **Тұрақтылық:** Доллардың бұл деңгейдегі өсімі үй бағасына сыни әсер етпейді.")
