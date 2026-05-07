@@ -112,10 +112,10 @@ districts = {
     "Сол Жағалау": {"mult": 1.32, "house": False, "apt": True},
     "Шұғыла": {"mult": 1.18, "house": True, "apt": True},
     "Байтерек": {"mult": 1.10, "house": False, "apt": True},
-    "Универсам": {"mult": 1.12, "house": False, "apt": True},
-    "Арай": {"mult": 1.15, "house": True, "apt": False},
+    "Универсам": {"mult": 1.12, "house": True, "apt": True},
+    "Арай": {"mult": 1.15, "house": True, "apt": True},
     "Ақмаржан": {"mult": 1.08, "house": False, "apt": True},
-    "Сәулет": {"mult": 0.98, "house": True, "apt": True},
+    "Сәулет": {"mult": 0.98, "house": False, "apt": True},
     "Микр. Мерей": {"mult": 1.05, "house": False, "apt": True},
     "Титов": {"mult": 0.85, "house": True, "apt": True}
 }
