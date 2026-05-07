@@ -5,7 +5,7 @@ import plotly.express as px
 import numpy as np
 
 # 1. Бет баптаулары
-st.set_page_config(page_title="AI Qyzylorda Realtor Pro", page_icon="🏠", layout="wide")
+st.set_page_config(page_title="Qyzylorda House Prediction", page_icon="🏠", layout="wide")
 
 st.markdown("""
     <style>
@@ -82,7 +82,7 @@ with st.sidebar:
     income = st.number_input("📈 Айлық табыс (₸)", value=650000)
 
 
-# 3. ЕСЕПТЕУ (FEATURE ENGINEERING ЕСКЕРІЛГЕН)
+# 3. ЕСЕПТЕУ
 def get_price(usd_rate, district_mult=1.0):
     USD_KZT = 450
     MULTIPLIER = 0.8
