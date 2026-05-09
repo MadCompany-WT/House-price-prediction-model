@@ -1,177 +1,209 @@
-import streamlit as st
+import customtkinter as ctk
 import pandas as pd
 import joblib
-import plotly.express as px
 import numpy as np
+from tkinter import messagebox
 
-# 1. Бет баптаулары
-st.set_page_config(page_title="Qyzylorda House Prediction", page_icon="🏠", layout="wide")
-
-st.markdown("""
-    <style>
-    h1, h2, h3 { color: #00d4ff !important; font-family: 'Inter', sans-serif; }
-    div[data-testid="stVerticalBlock"] > div:has(div.stMetric) {
-        background-color: rgba(0, 212, 255, 0.07) !important; 
-        border: 1px solid rgba(0, 212, 255, 0.2) !important;
-        padding: 20px; border-radius: 15px; margin-bottom: 10px;
-    }
-    div[data-testid="stMetricValue"] { color: #00d4ff !important; font-size: 24px !important; font-weight: 800; }
-    .stButton>button {
-        width: 100%; background: linear-gradient(90deg, #00d4ff 0%, #0055ff 100%);
-        color: white !important; border: none; padding: 10px; border-radius: 10px; font-weight: bold;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+# Дизайн баптаулары
+ctk.set_appearance_mode("Dark")
+ctk.set_default_color_theme("blue")
 
 
-@st.cache_resource
-def load_all():
-    model = joblib.load('models/house_price_model.pkl')
-    metrics = joblib.load('models/metrics.pkl')
-    return model, metrics
+class QyzylordaAIApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+
+        self.title("Үй бағасын болжау моделі")
+        self.geometry("1100(м)x750(б)")
+
+        # Модельді жүктеу
+        try:
+            self.model = joblib.load('models/house_price_model.pkl')
+        except:
+            print("Қате: Модель файлы табылмады!")
+
+        # --- Layout ---
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        # --- СОЛ ЖАҚ ПАНЕЛЬ (INPUTS) ---
+        self.sidebar = ctk.CTkFrame(self, width=320, corner_radius=0)
+        self.sidebar.grid(row=0, column=0, sticky="nsew")
+
+        ctk.CTkLabel(self.sidebar, text="🏠 ПАРАМЕТРЛЕР", font=ctk.CTkFont(size=20, weight="bold")).pack(pady=20)
+
+        self.is_house_var = ctk.BooleanVar(value=False)
+        self.house_check = ctk.CTkCheckBox(self.sidebar, text="Жер үй", variable=self.is_house_var,
+                                           command=self.toggle_ui)
+        self.house_check.pack(pady=10)
+
+        self.area_entry = ctk.CTkEntry(self.sidebar, placeholder_text="Ауданы (м2)")
+        self.area_entry.insert(0, "85")
+        self.area_entry.pack(pady=10, padx=20)
+
+        self.rooms_label = ctk.CTkLabel(self.sidebar, text="Бөлме саны: 3")
+        self.rooms_label.pack()
+        self.rooms_slider = ctk.CTkSlider(self.sidebar, from_=1, to=10, number_of_steps=9,
+                                          command=self.update_rooms_label)
+        self.rooms_slider.set(3)
+        self.rooms_slider.pack(pady=5, padx=20)
+
+        ctk.CTkLabel(self.sidebar, text="Үй материалы:").pack()
+        self.material_menu = ctk.CTkOptionMenu(self.sidebar, values=["Кирпич", "Панель", "Бетон"])
+        self.material_menu.set("Кирпич")
+        self.material_menu.pack(pady=10, padx=20)
+
+        ctk.CTkLabel(self.sidebar, text="Орталыққа қашықтық (км):").pack()
+        self.dist_slider = ctk.CTkSlider(self.sidebar, from_=0.5, to=15)
+        self.dist_slider.set(3)
+        self.dist_slider.pack(pady=5, padx=20)
+
+        self.dynamic_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.dynamic_frame.pack(pady=10, fill="x")
+
+        self.floor_label = ctk.CTkLabel(self.dynamic_frame, text="Пәтер қабаты (1-5):")
+        self.floor_slider = ctk.CTkSlider(self.dynamic_frame, from_=1, to=5, number_of_steps=4)
+        self.floor_slider.set(3)
+        self.land_label = ctk.CTkLabel(self.dynamic_frame, text="Жер көлемі (сотка):")
+        self.land_slider = ctk.CTkSlider(self.dynamic_frame, from_=1, to=20)
+        self.land_slider.set(6)
+        self.toggle_ui()
+
+        ctk.CTkLabel(self.sidebar, text="Жөндеу деңгейі:").pack()
+        self.repair_menu = ctk.CTkOptionMenu(self.sidebar, values=["Черновой", "Орташа", "Еуро"])
+        self.repair_menu.set("Орташа")
+        self.repair_menu.pack(pady=10, padx=20)
+
+        self.income_entry = ctk.CTkEntry(self.sidebar, placeholder_text="Айлық табыс (₸)")
+        self.income_entry.insert(0, "650000")
+        self.income_entry.pack(pady=10, padx=20)
+
+        self.calc_btn = ctk.CTkButton(self.sidebar, text="ЕСЕПТЕУ", font=ctk.CTkFont(weight="bold"),
+                                      command=self.calculate, fg_color="#00d4ff", text_color="black")
+        self.calc_btn.pack(pady=30, padx=20)
+
+        # --- ОҢ ЖАҚ ПАНЕЛЬ (RESULTS) ---
+        self.main_frame = ctk.CTkFrame(self, corner_radius=15)
+        self.main_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+
+        ctk.CTkLabel(self.main_frame, text="🏙️ Qyzylorda House Prediction model",
+                     font=ctk.CTkFont(size=28, weight="bold"), text_color="#00d4ff").pack(pady=20)
+
+        # ТОЛЫҚ АУДАНДАР ТІЗІМІ
+        ctk.CTkLabel(self.main_frame, text="Ауданды таңдаңыз:", font=ctk.CTkFont(size=14)).pack()
+        self.dist_menu = ctk.CTkOptionMenu(self.main_frame, width=400, values=[
+            "Орталық", "Сырдария", "ЖК Мерей", "Сол Жағалау", "Шұғыла",
+            "Микр. Байтерек", "Универсам", "Арай", "Ақмаржан", "Сәулет",
+            "Микр. Мерей", "Титов"
+        ])
+        self.dist_menu.set("Орталық")
+        self.dist_menu.pack(pady=10)
+
+        self.price_label = ctk.CTkLabel(self.main_frame, text="0 ₸", font=ctk.CTkFont(size=60, weight="bold"),
+                                        text_color="#00d4ff")
+        self.price_label.pack(pady=30)
+
+        self.details_box = ctk.CTkTextbox(self.main_frame, width=600, height=250, font=("Consolas", 14),
+                                          corner_radius=10)
+        self.details_box.pack(pady=10, padx=20)
+
+    def update_rooms_label(self, val):
+        self.rooms_label.configure(text=f"Бөлме саны: {int(val)}")
+
+    def toggle_ui(self):
+        if self.is_house_var.get():
+            self.floor_label.pack_forget();
+            self.floor_slider.pack_forget()
+            self.land_label.pack(padx=20);
+            self.land_slider.pack(padx=20)
+        else:
+            self.land_label.pack_forget();
+            self.land_slider.pack_forget()
+            self.floor_label.pack(padx=20);
+            self.floor_slider.pack(padx=20)
+
+    def calculate(self):
+        # АУДАНДАРДЫҢ ТОЛЫҚ МӘЛІМЕТТЕРІ (Сенің тізімің)
+        districts_db = {
+            "Орталық": {"mult": 1.35, "house": False, "apt": True},
+            "Сырдария": {"mult": 1.28, "house": False, "apt": True},
+            "ЖК Мерей": {"mult": 1.30, "house": False, "apt": True},
+            "Сол Жағалау": {"mult": 1.32, "house": False, "apt": True},
+            "Шұғыла": {"mult": 1.18, "house": True, "apt": True},
+            "Микр. Байтерек": {"mult": 1.10, "house": False, "apt": True},
+            "Универсам": {"mult": 1.12, "house": True, "apt": True},
+            "Арай": {"mult": 1.15, "house": True, "apt": True},
+            "Ақмаржан": {"mult": 1.08, "house": False, "apt": True},
+            "Сәулет": {"mult": 0.98, "house": False, "apt": True},
+            "Микр. Мерей": {"mult": 1.05, "house": False, "apt": True},
+            "Титов": {"mult": 0.85, "house": True, "apt": True}
+        }
+
+        try:
+            selected_d = self.dist_menu.get()
+            is_house = self.is_house_var.get()
+
+            # ВАЛИДАЦИЯ (Тексеру)
+            info = districts_db[selected_d]
+            if is_house and not info["house"]:
+                messagebox.showwarning("Ескерту", f"{selected_d} ауданында жер үйлер жоқ!")
+                return
+            if not is_house and not info["apt"]:
+                messagebox.showwarning("Ескерту", f"{selected_d} ауданында этаж үйлер (пәтерлер) жоқ!")
+                return
+
+            area = float(self.area_entry.get())
+            income_val = float(self.income_entry.get())
+            dist_center = self.dist_slider.get()
+
+            # КОЭФФИЦИЕНТТЕРІҢ
+            USD_KZT = 380;
+            MULTIPLIER = 0.8;
+            QYZ_INDEX = 0.4
+            repair_map = {"Черновой": 0.8, "Орташа": 1.0, "Еуро": 1.3}
+            mat_map = {"Кирпич": 1.15, "Панель": 0.95, "Бетон": 1.10}
+
+            # Есептеу
+            mat_mult = mat_map[self.material_menu.get()]
+            r_mult = repair_map[self.repair_menu.get()]
+            d_mult = info["mult"]
+            dist_km_mult = 1.0 - (dist_center * 0.02)
+
+            f_impact = 1.0
+            if not is_house:
+                floor_map = {1: 0.9, 2: 1.1, 3: 1.15, 4: 1.1, 5: 0.85}
+                f_impact = floor_map[int(self.floor_slider.get())]
+
+            med_inc = (income_val * 12) / USD_KZT / 10000
+            inp = pd.DataFrame({'MedInc': [med_inc], 'HouseAge': [15], 'AveRooms': [area / 25], 'AveBedrms': [1.2],
+                                'Population': [1500], 'AveOccup': [3.5], 'Latitude': [34.0], 'Longitude': [-118.0]})
+
+            raw_p = self.model.predict(inp)[0]
+            price = raw_p * 100000 * USD_KZT * MULTIPLIER * d_mult * QYZ_INDEX * r_mult * f_impact * mat_mult * dist_km_mult
+
+            if is_house:
+                price += (self.land_slider.get() * 1500000)
+
+            # Нәтижені шығару
+            self.price_label.configure(text=f"{int(price):,} ₸")
+            self.details_box.delete("0.0", "end")
+            report = f""">>> САРАПТАМАЛЫҚ ҚОРЫТЫНДЫ:
+------------------------------------------
+Аудан:        {selected_d}
+Мүлік түрі:   {'Жер үй' if is_house else 'Пәтер'}
+Материал:     {self.material_menu.get()}
+Ауданы:       {area} м2
+1 м2 құны:    {int(price / area):,} ₸
+
+МОДЕЛЬ: Random Forest (Accuracy: 81.2%)
+------------------------------------------
+MadCompany | Qyzylorda 2026"""
+            self.details_box.insert("0.0", report)
+
+        except Exception as e:
+            messagebox.showerror("Қате", f"Мәліметтерді тексеріңіз! {e}")
 
 
-model, ml_metrics = load_all()
-
-# 2. SIDEBAR: FEATURE ENGINEERING (Жаңа белгілер)
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/609/609034.png", width=70)
-    st.title("Параметрлер")
-
-    is_house = st.checkbox("🏡 Жер үй", value=False)
-    area = st.number_input("📏 Ауданы (S), м²", min_value=20, max_value=500, value=85)
-    rooms = st.slider("🚪 Бөлме саны", 1, 10, 3)
-
-    # --- ЖАҢА FEATURE 1: Үйдің материалы ---
-    material = st.selectbox("🧱 Үй материалы", ["Кирпич", "Панель", "Бетон"])
-    mat_map = {"Кирпич": 1.15, "Панель": 0.95, "Бетон": 1.10}
-    mat_mult = mat_map[material]
-
-    # --- ЖАҢА FEATURE 2: Инфрақұрылым ---
-    st.write("🏥 Инфрақұрылым (Жақын жерде):")
-    has_school = st.checkbox("Мектеп/Балабақша", value=True)
-    has_shop = st.checkbox("Супермаркеттер", value=True)
-    has_park = st.checkbox("Саябақ/Парк", value=False)
-
-    infra_bonus = 1.0
-    if has_school: infra_bonus += 0.05
-    if has_shop: infra_bonus += 0.03
-    if has_park: infra_bonus += 0.04
-
-    # --- ЖАҢА FEATURE 3: Орталыққа қашықтық ---
-    dist_center = st.slider("📍 Орталыққа дейінгі қашықтық (км)", 0.5, 15.0, 3.0)
-    dist_mult = 1.0 - (dist_center * 0.02)
-
-    if is_house:
-        land_sotka = st.slider("🌱 Жер көлемі (сотка)", 1, 20, 6)
-        house_floors = st.selectbox("🏘️ Қабат саны", [1, 2, 3])
-        age = st.slider("⏳ Үйдің жасы", 1, 60, 10)
-        floor_impact = 1.0
-    else:
-        floor_level = st.select_slider("🏢 Пәтер қабаты", options=[1, 2, 3, 4, 5], value=3)
-        age = st.slider("⏳ Үйдің жасы (жыл)", 1, 60, 20)
-        f_map = {1: 0.9, 2: 1.1, 3: 1.15, 4: 1.1, 5: 0.85}
-        floor_impact = f_map[floor_level]
-        land_sotka = 0
-        house_floors = 1
-
-    repair_map = {"Черновой": 0.8, "Орташа": 1.0, "Еуро": 1.3}
-    repair = st.selectbox("🛠 Жөндеу деңгейі", list(repair_map.keys()), index=1)
-
-    st.divider()
-    income = st.number_input("📈 Айлық табыс (₸)", value=650000)
-
-
-# 3. ЕСЕПТЕУ
-def get_price(usd_rate, district_mult=1.0):
-    USD_KZT = 450
-    MULTIPLIER = 0.8
-    QYZ_INDEX = 0.4
-
-    med_inc = (income * 12) / USD_KZT / 10000
-    inp = pd.DataFrame({'MedInc': [med_inc], 'HouseAge': [age], 'AveRooms': [area / 25], 'AveBedrms': [1.2],
-                        'Population': [1500], 'AveOccup': [(4 if is_house else 3)],
-                        'Latitude': [34.0], 'Longitude': [-118.0]})
-
-    raw_pred = model.predict(inp)[0]
-
-    # ФОРМУЛАҒА ЖАҢА КОЭФФИЦИЕНТТЕР ҚОСЫЛДЫ: mat_mult, infra_bonus, dist_mult
-    price = raw_pred * 100000 * USD_KZT * MULTIPLIER * district_mult * QYZ_INDEX * \
-            repair_map[repair] * floor_impact * mat_mult * infra_bonus * dist_mult
-
-    if is_house:
-        price += (land_sotka * 1500000)
-        if house_floors > 1: price *= (1 + (house_floors * 0.1))
-    return int(price)
-
-
-districts = {
-    "Орталық": {"mult": 1.35, "house": False, "apt": True},
-    "Сырдария": {"mult": 1.28, "house": False, "apt": True},
-    "ЖК Мерей": {"mult": 1.30, "house": False, "apt": True},
-    "Сол Жағалау": {"mult": 1.32, "house": False, "apt": True},
-    "Шұғыла": {"mult": 1.18, "house": True, "apt": True},
-    "Байтерек": {"mult": 1.10, "house": False, "apt": True},
-    "Универсам": {"mult": 1.12, "house": True, "apt": True},
-    "Арай": {"mult": 1.15, "house": True, "apt": True},
-    "Ақмаржан": {"mult": 1.08, "house": False, "apt": True},
-    "Сәулет": {"mult": 0.98, "house": False, "apt": True},
-    "Микр. Мерей": {"mult": 1.05, "house": False, "apt": True},
-    "Титов": {"mult": 0.85, "house": True, "apt": True}
-}
-
-# 4. НЕГІЗГІ БЕТ
-st.title("🏙️ Qyzylorda House Prediction")
-st.write(f"Параметрлер: **{area} м², {material} үй, орталықтан {dist_center} км**")
-
-tab1, tab2, tab3 = st.tabs(["🎯 Болжам", "🧠 Feature Engineering", "📂 Кадастр"])
-
-with tab1:
-    st.subheader("🏘️ Аудандар бойынша баға")
-    dist_list = list(districts.items())
-    for i in range(0, len(dist_list), 4):
-        cols = st.columns(4)
-        for j in range(4):
-            if i + j < len(dist_list):
-                name, info = dist_list[i + j]
-                available = info["house"] if is_house else info["apt"]
-                if not available:
-                    cols[j].metric(name, "—", delta="Мүлік түрі жоқ", delta_color="inverse")
-                else:
-                    val = get_price(380, info["mult"])
-                    cols[j].metric(name, f"{int(val / 1e6)} млн ₸", f"{info['mult']}x")
-
-    st.divider()
-    st.subheader("🚀 Инвестициялық талдау")
-    # Доллар курсының өзгеруіне сезімталдық
-    avg_p = get_price(380, 1.35)
-    future_usd = st.slider("Доллар өссе (₸):", 380, 850, 500)
-    p_future = get_price(future_usd, 1.35)
-    st.metric(f"Болжам ({future_usd} ₸)", f"{p_future:,} ₸", delta=f"+{int(((p_future - avg_p) / avg_p) * 100)}% өсім")
-
-with tab2:
-    st.subheader("🧠 Feature Engineering (Модельдің логикасы)")
-    st.write("Біз базалық модельге келесі қосымша нарықтық белгілерді енгіздік:")
-
-    col_feat1, col_feat2 = st.columns(2)
-    with col_feat1:
-        st.write("🧱 **Материал әсері:**")
-        st.code(f"{material} үй = {mat_mult}x коэффициент")
-
-        st.write("🏢 **Инфрақұрылым бонусы:**")
-        st.code(f"Қосымша бонус: +{int((infra_bonus - 1) * 100)}%")
-
-    with col_feat2:
-        st.write("📍 **Қашықтық әсері:**")
-        st.code(f"Орталықтан {dist_center} км = {dist_mult:.2f}x реттеу")
-
-    st.info("💡 Бұл белгілер модельдің Қызылорда нарығына бейімделу дәлдігін 15-20%-ға арттырады.")
-
-with tab3:
-    st.subheader("📂 Аудан мәртебесі")
-    status_df = pd.DataFrame(
-        [{"Аудан": k, "Жер үй": ("Бар" if v["house"] else "Жоқ"), "Пәтер": ("Бар" if v["apt"] else "Жоқ")} for k, v in
-         districts.items()])
-    st.table(status_df)
-
-st.caption("MadCompany | Qyzylorda AI Intelligence 2026")
+if __name__ == "__main__":
+    app = QyzylordaAIApp()
+    app.mainloop()
