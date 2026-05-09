@@ -52,4 +52,4 @@
    
 4. **Веб-қосымшаны (интерфейсті) іске қосыңыз:**
    ```bash
-   streamlit run app.py
+   python app.py

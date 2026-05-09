@@ -14,7 +14,7 @@ class QyzylordaAIApp(ctk.CTk):
         super().__init__()
 
         self.title("Үй бағасын болжау моделі")
-        self.geometry("1100(м)x750(б)")
+        self.geometry("1100x800")  # Өлшем түзелді
 
         # Модельді жүктеу
         try:
@@ -41,46 +41,60 @@ class QyzylordaAIApp(ctk.CTk):
         self.area_entry.insert(0, "85")
         self.area_entry.pack(pady=10, padx=20)
 
-        self.rooms_label = ctk.CTkLabel(self.sidebar, text="Бөлме саны: 3")
+        self.rooms_label = ctk.CTkLabel(self.sidebar, text="Бөлме саны: 3", font=ctk.CTkFont(weight="bold"))
         self.rooms_label.pack()
         self.rooms_slider = ctk.CTkSlider(self.sidebar, from_=1, to=10, number_of_steps=9,
                                           command=self.update_rooms_label)
         self.rooms_slider.set(3)
         self.rooms_slider.pack(pady=5, padx=20)
 
-        ctk.CTkLabel(self.sidebar, text="Үй материалы:").pack()
-        self.material_menu = ctk.CTkOptionMenu(self.sidebar, values=["Кирпич", "Панель", "Бетон"])
-        self.material_menu.set("Кирпич")
-        self.material_menu.pack(pady=10, padx=20)
-
-        ctk.CTkLabel(self.sidebar, text="Орталыққа қашықтық (км):").pack()
-        self.dist_slider = ctk.CTkSlider(self.sidebar, from_=0.5, to=15)
-        self.dist_slider.set(3)
+        # ОРТАЛЫҚҚА ҚАШЫҚТЫҚ ПЕН ЦИФРАСЫ
+        ctk.CTkLabel(self.sidebar, text="Орталыққа қашықтық:").pack(pady=(10, 0))
+        self.dist_val_label = ctk.CTkLabel(self.sidebar, text="3.0 км", text_color="#00d4ff",
+                                           font=ctk.CTkFont(weight="bold"))
+        self.dist_val_label.pack()
+        self.dist_slider = ctk.CTkSlider(self.sidebar, from_=0.5, to=15, command=self.update_dist_label)
+        self.dist_slider.set(3.0)
         self.dist_slider.pack(pady=5, padx=20)
 
         self.dynamic_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.dynamic_frame.pack(pady=10, fill="x")
 
-        self.floor_label = ctk.CTkLabel(self.dynamic_frame, text="Пәтер қабаты (1-5):")
-        self.floor_slider = ctk.CTkSlider(self.dynamic_frame, from_=1, to=5, number_of_steps=4)
+        # ПӘТЕР ҚАБАТЫ ПЕН ЦИФРАСЫ
+        self.floor_label_title = ctk.CTkLabel(self.dynamic_frame, text="Пәтер қабаты (1-5):")
+        self.floor_val_label = ctk.CTkLabel(self.dynamic_frame, text="3", text_color="#00d4ff",
+                                            font=ctk.CTkFont(weight="bold"))
+        self.floor_slider = ctk.CTkSlider(self.dynamic_frame, from_=1, to=5, number_of_steps=4,
+                                          command=self.update_floor_label)
         self.floor_slider.set(3)
-        self.land_label = ctk.CTkLabel(self.dynamic_frame, text="Жер көлемі (сотка):")
-        self.land_slider = ctk.CTkSlider(self.dynamic_frame, from_=1, to=20)
+
+        # ЖЕР КӨЛЕМІ ПЕН ЦИФРАСЫ
+        self.land_label_title = ctk.CTkLabel(self.dynamic_frame, text="Жер көлемі (сотка):")
+        self.land_val_label = ctk.CTkLabel(self.dynamic_frame, text="6", text_color="#00d4ff",
+                                           font=ctk.CTkFont(weight="bold"))
+        self.land_slider = ctk.CTkSlider(self.dynamic_frame, from_=1, to=20, number_of_steps=19,
+                                         command=self.update_land_label)
         self.land_slider.set(6)
+
         self.toggle_ui()
 
-        ctk.CTkLabel(self.sidebar, text="Жөндеу деңгейі:").pack()
+        ctk.CTkLabel(self.sidebar, text="Үй материалы:").pack(pady=(10, 0))
+        self.material_menu = ctk.CTkOptionMenu(self.sidebar, values=["Кирпич", "Панель", "Бетон"])
+        self.material_menu.set("Кирпич")
+        self.material_menu.pack(pady=5, padx=20)
+
+        ctk.CTkLabel(self.sidebar, text="Жөндеу деңгейі:").pack(pady=(10, 0))
         self.repair_menu = ctk.CTkOptionMenu(self.sidebar, values=["Черновой", "Орташа", "Еуро"])
         self.repair_menu.set("Орташа")
-        self.repair_menu.pack(pady=10, padx=20)
+        self.repair_menu.pack(pady=5, padx=20)
 
         self.income_entry = ctk.CTkEntry(self.sidebar, placeholder_text="Айлық табыс (₸)")
         self.income_entry.insert(0, "650000")
-        self.income_entry.pack(pady=10, padx=20)
+        self.income_entry.pack(pady=20, padx=20)
 
         self.calc_btn = ctk.CTkButton(self.sidebar, text="ЕСЕПТЕУ", font=ctk.CTkFont(weight="bold"),
                                       command=self.calculate, fg_color="#00d4ff", text_color="black")
-        self.calc_btn.pack(pady=30, padx=20)
+        self.calc_btn.pack(pady=10, padx=20)
 
         # --- ОҢ ЖАҚ ПАНЕЛЬ (RESULTS) ---
         self.main_frame = ctk.CTkFrame(self, corner_radius=15)
@@ -89,8 +103,6 @@ class QyzylordaAIApp(ctk.CTk):
         ctk.CTkLabel(self.main_frame, text="🏙️ Qyzylorda House Prediction model",
                      font=ctk.CTkFont(size=28, weight="bold"), text_color="#00d4ff").pack(pady=20)
 
-        # ТОЛЫҚ АУДАНДАР ТІЗІМІ
-        ctk.CTkLabel(self.main_frame, text="Ауданды таңдаңыз:", font=ctk.CTkFont(size=14)).pack()
         self.dist_menu = ctk.CTkOptionMenu(self.main_frame, width=400, values=[
             "Орталық", "Сырдария", "ЖК Мерей", "Сол Жағалау", "Шұғыла",
             "Микр. Байтерек", "Универсам", "Арай", "Ақмаржан", "Сәулет",
@@ -107,23 +119,36 @@ class QyzylordaAIApp(ctk.CTk):
                                           corner_radius=10)
         self.details_box.pack(pady=10, padx=20)
 
+    # --- ЖАҢАРТУ ФУНКЦИЯЛАРЫ ---
     def update_rooms_label(self, val):
         self.rooms_label.configure(text=f"Бөлме саны: {int(val)}")
 
+    def update_dist_label(self, val):
+        self.dist_val_label.configure(text=f"{val:.1f} км")
+
+    def update_floor_label(self, val):
+        self.floor_val_label.configure(text=f"{int(val)}")
+
+    def update_land_label(self, val):
+        self.land_val_label.configure(text=f"{int(val)} сотка")
+
     def toggle_ui(self):
         if self.is_house_var.get():
-            self.floor_label.pack_forget();
+            self.floor_label_title.pack_forget();
+            self.floor_val_label.pack_forget();
             self.floor_slider.pack_forget()
-            self.land_label.pack(padx=20);
+            self.land_label_title.pack();
+            self.land_val_label.pack();
             self.land_slider.pack(padx=20)
         else:
-            self.land_label.pack_forget();
+            self.land_label_title.pack_forget();
+            self.land_val_label.pack_forget();
             self.land_slider.pack_forget()
-            self.floor_label.pack(padx=20);
+            self.floor_label_title.pack();
+            self.floor_val_label.pack();
             self.floor_slider.pack(padx=20)
 
     def calculate(self):
-        # АУДАНДАРДЫҢ ТОЛЫҚ МӘЛІМЕТТЕРІ (Сенің тізімің)
         districts_db = {
             "Орталық": {"mult": 1.35, "house": False, "apt": True},
             "Сырдария": {"mult": 1.28, "house": False, "apt": True},
@@ -142,14 +167,13 @@ class QyzylordaAIApp(ctk.CTk):
         try:
             selected_d = self.dist_menu.get()
             is_house = self.is_house_var.get()
-
-            # ВАЛИДАЦИЯ (Тексеру)
             info = districts_db[selected_d]
+
             if is_house and not info["house"]:
-                messagebox.showwarning("Ескерту", f"{selected_d} ауданында жер үйлер жоқ!")
+                messagebox.showwarning("Ескерту", f"{selected_d} ауданында жер үйлер жоқ!");
                 return
             if not is_house and not info["apt"]:
-                messagebox.showwarning("Ескерту", f"{selected_d} ауданында этаж үйлер (пәтерлер) жоқ!")
+                messagebox.showwarning("Ескерту", f"{selected_d} ауданында этаж үйлер жоқ!");
                 return
 
             area = float(self.area_entry.get())
@@ -163,7 +187,6 @@ class QyzylordaAIApp(ctk.CTk):
             repair_map = {"Черновой": 0.8, "Орташа": 1.0, "Еуро": 1.3}
             mat_map = {"Кирпич": 1.15, "Панель": 0.95, "Бетон": 1.10}
 
-            # Есептеу
             mat_mult = mat_map[self.material_menu.get()]
             r_mult = repair_map[self.repair_menu.get()]
             d_mult = info["mult"]
@@ -184,18 +207,14 @@ class QyzylordaAIApp(ctk.CTk):
             if is_house:
                 price += (self.land_slider.get() * 1500000)
 
-            # Нәтижені шығару
             self.price_label.configure(text=f"{int(price):,} ₸")
             self.details_box.delete("0.0", "end")
             report = f""">>> САРАПТАМАЛЫҚ ҚОРЫТЫНДЫ:
 ------------------------------------------
 Аудан:        {selected_d}
 Мүлік түрі:   {'Жер үй' if is_house else 'Пәтер'}
-Материал:     {self.material_menu.get()}
-Ауданы:       {area} м2
+Орталықтан:   {dist_center:.1f} км
 1 м2 құны:    {int(price / area):,} ₸
-
-МОДЕЛЬ: Random Forest (Accuracy: 81.2%)
 ------------------------------------------
 MadCompany | Qyzylorda 2026"""
             self.details_box.insert("0.0", report)
