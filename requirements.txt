@@ -3,7 +3,5 @@ numpy
 scikit-learn
 joblib
 matplotlib
-seaborn
-streamlit
-plotly
+customtkinter
 
