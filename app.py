@@ -1,235 +1,214 @@
-import customtkinter as ctk
+import sys
 import pandas as pd
 import joblib
 import numpy as np
-from tkinter import messagebox
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                             QHBoxLayout, QLabel, QLineEdit, QSlider, QCheckBox,
+                             QComboBox, QPushButton, QTextEdit, QFrame)
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
 
-# Дизайн баптаулары
-ctk.set_appearance_mode("Dark")
-ctk.set_default_color_theme("blue")
 
-
-class QyzylordaAIApp(ctk.CTk):
+class QyzylordaAIApp(QMainWindow):
     def __init__(self):
         super().__init__()
-
-        self.title("Үй бағасын болжау моделі")
-        self.geometry("1150x850")
+        self.setWindowTitle("Qyzylorda House Price Prediction Model")
+        self.setMinimumSize(1000, 750)
 
         # Модельді жүктеу
         try:
             self.model = joblib.load('models/house_price_model.pkl')
         except:
-            print("Қате: Модель файлы табылмады!")
+            print("Модель файлы табылмады!")
 
-        # --- Layout ---
-        self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(0, weight=1)
+        # СТИЛЬ (Modern Dark UI)
+        self.setStyleSheet("""
+            QMainWindow { background-color: #0e1117; }
+            QFrame#Block { 
+                background-color: #161b22; 
+                border-radius: 20px; 
+                border: 1px solid #30363d; 
+            }
+            QLabel { color: #e6edf3; font-family: 'Segoe UI'; font-size: 14px; }
+            QLabel#Header { color: #00d4ff; font-size: 26px; font-weight: bold; }
+            QLabel#Price { color: #00d4ff; font-size: 50px; font-weight: bold; }
+            QPushButton { 
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00d4ff, stop:1 #0055ff);
+                color: white; border-radius: 12px; font-weight: bold; height: 50px; font-size: 16px;
+            }
+            QPushButton:hover { background: #00b4d8; }
+            QComboBox, QLineEdit { 
+                background-color: #0d1117; color: white; border: 1px solid #30363d; 
+                border-radius: 8px; padding: 8px; font-size: 14px;
+            }
+            QCheckBox { color: white; font-weight: bold; }
+            QSlider::handle:horizontal { background: #00d4ff; width: 18px; border-radius: 9px; }
+        """)
 
-        # --- СОЛ ЖАҚ ПАНЕЛЬ (INPUTS) ---
-        self.sidebar = ctk.CTkFrame(self, width=340, corner_radius=0)
-        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
 
-        ctk.CTkLabel(self.sidebar, text="🏠 ПАРАМЕТРЛЕР", font=ctk.CTkFont(size=20, weight="bold")).pack(pady=20)
+        # HEADER
+        header_lbl = QLabel("🏙️ Qyzylorda House Price Prediction Model")
+        header_lbl.setObjectName("Header")
+        header_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(header_lbl)
 
-        self.is_house_var = ctk.BooleanVar(value=False)
-        self.house_check = ctk.CTkCheckBox(self.sidebar, text="Жер үй", variable=self.is_house_var,
-                                           command=self.toggle_ui)
-        self.house_check.pack(pady=5)
+        content_layout = QHBoxLayout()
+        main_layout.addLayout(content_layout)
 
-        self.area_entry = ctk.CTkEntry(self.sidebar, placeholder_text="Ауданы (м2)")
-        self.area_entry.insert(0, "85")
-        self.area_entry.pack(pady=10, padx=20)
+        # --- BLOCK 1: ПАРАМЕТРЛЕР ---
+        self.block1 = QFrame();
+        self.block1.setObjectName("Block")
+        b1_layout = QVBoxLayout(self.block1)
+        b1_layout.addWidget(QLabel("📋 НЫСАН СИПАТТАМАСЫ", font=QFont("Arial", 12, QFont.Weight.Bold)))
 
-        self.rooms_label = ctk.CTkLabel(self.sidebar, text="Бөлме саны: 3", font=ctk.CTkFont(weight="bold"))
-        self.rooms_label.pack()
-        self.rooms_slider = ctk.CTkSlider(self.sidebar, from_=1, to=10, number_of_steps=9,
-                                          command=self.update_rooms_label)
-        self.rooms_slider.set(3)
-        self.rooms_slider.pack(pady=5, padx=20)
+        self.is_house = QCheckBox("🏡 Бұл жеке жер үй")
+        self.is_house.stateChanged.connect(self.toggle_ui)
+        b1_layout.addWidget(self.is_house)
 
-        # ОРТАЛЫҚҚА ҚАШЫҚТЫҚ
-        ctk.CTkLabel(self.sidebar, text="Орталыққа қашықтық:").pack(pady=(10, 0))
-        self.dist_val_label = ctk.CTkLabel(self.sidebar, text="3.0 км", text_color="#00d4ff",
-                                           font=ctk.CTkFont(weight="bold"))
-        self.dist_val_label.pack()
-        self.dist_slider = ctk.CTkSlider(self.sidebar, from_=0.5, to=15, command=self.update_dist_label)
-        self.dist_slider.set(3.0)
-        self.dist_slider.pack(pady=5, padx=20)
+        self.area_input = QLineEdit("85")
+        b1_layout.addWidget(QLabel("Ауданы (м²):"));
+        b1_layout.addWidget(self.area_input)
 
-        # --- ЖАҢА: ИНФРАҚҰРЫЛЫМ БӨЛІМІ ---
-        ctk.CTkLabel(self.sidebar, text="🏥 Инфрақұрылым (жақын жерде):", font=ctk.CTkFont(size=14, weight="bold")).pack(
-            pady=(15, 5))
-        self.infra_school = ctk.CTkCheckBox(self.sidebar, text="Мектеп / Балабақша")
-        self.infra_school.pack(padx=20, anchor="w", pady=2)
-        self.infra_shop = ctk.CTkCheckBox(self.sidebar, text="Супермаркеттер")
-        self.infra_shop.pack(padx=20, anchor="w", pady=2)
-        self.infra_park = ctk.CTkCheckBox(self.sidebar, text="Саябақ / Парк")
-        self.infra_park.pack(padx=20, anchor="w", pady=2)
+        self.rooms_slider = QSlider(Qt.Orientation.Horizontal)
+        self.rooms_slider.setRange(1, 10);
+        self.rooms_slider.setValue(3)
+        self.rooms_lbl = QLabel("Бөлме саны: 3")
+        self.rooms_slider.valueChanged.connect(lambda v: self.rooms_lbl.setText(f"Бөлме саны: {v}"))
+        b1_layout.addWidget(self.rooms_lbl);
+        b1_layout.addWidget(self.rooms_slider)
 
-        self.dynamic_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        self.dynamic_frame.pack(pady=10, fill="x")
+        self.mat_menu = QComboBox()
+        self.mat_menu.addItems(["Кирпич", "Панель", "Бетон"])
+        b1_layout.addWidget(QLabel("Үй материалы:"));
+        b1_layout.addWidget(self.mat_menu)
 
-        # ПӘТЕР ҚАБАТЫ
-        self.floor_label_title = ctk.CTkLabel(self.dynamic_frame, text="Пәтер қабаты (1-5):")
-        self.floor_val_label = ctk.CTkLabel(self.dynamic_frame, text="3", text_color="#00d4ff",
-                                            font=ctk.CTkFont(weight="bold"))
-        self.floor_slider = ctk.CTkSlider(self.dynamic_frame, from_=1, to=5, number_of_steps=4,
-                                          command=self.update_floor_label)
-        self.floor_slider.set(3)
+        self.rep_menu = QComboBox()
+        self.rep_menu.addItems(["Черновой", "Орташа", "Еуро"])
+        self.rep_menu.setCurrentText("Орташа")
+        b1_layout.addWidget(QLabel("Жөндеу деңгейі:"));
+        b1_layout.addWidget(self.rep_menu)
 
-        # ЖЕР КӨЛЕМІ
-        self.land_label_title = ctk.CTkLabel(self.dynamic_frame, text="Жер көлемі (сотка):")
-        self.land_val_label = ctk.CTkLabel(self.dynamic_frame, text="6", text_color="#00d4ff",
-                                           font=ctk.CTkFont(weight="bold"))
-        self.land_slider = ctk.CTkSlider(self.dynamic_frame, from_=1, to=20, number_of_steps=19,
-                                         command=self.update_land_label)
-        self.land_slider.set(6)
+        content_layout.addWidget(self.block1)
 
-        self.toggle_ui()
+        # --- BLOCK 2: ЛОКАЦИЯ ЖӘНЕ ЭКОНОМИКА ---
+        self.block2 = QFrame();
+        self.block2.setObjectName("Block")
+        b2_layout = QVBoxLayout(self.block2)
+        b2_layout.addWidget(QLabel("📍 ЛОКАЦИЯ ЖӘНЕ ВАЛЮТА", font=QFont("Arial", 12, QFont.Weight.Bold)))
 
-        ctk.CTkLabel(self.sidebar, text="Үй материалы:").pack(pady=(10, 0))
-        self.material_menu = ctk.CTkOptionMenu(self.sidebar, values=["Кирпич", "Панель", "Бетон"])
-        self.material_menu.set("Кирпич");
-        self.material_menu.pack(pady=5, padx=20)
+        self.districts_db = {
+            "Орталық": {"m": 1.35, "h": False, "a": True}, "Сырдария": {"m": 1.28, "h": False, "a": True},
+            "ЖК Мерей": {"m": 1.30, "h": False, "a": True}, "Сол Жағалау": {"m": 1.32, "h": False, "a": True},
+            "Шұғыла": {"m": 1.18, "h": True, "a": True}, "Микр. Байтерек": {"m": 1.10, "h": False, "a": True},
+            "Универсам": {"m": 1.12, "h": False, "a": True}, "Арай": {"m": 1.15, "h": True, "a": False},
+            "Ақмаржан": {"m": 1.08, "h": False, "a": True}, "Сәулет": {"m": 0.98, "h": False, "a": True},
+            "Микр. Мерей": {"m": 1.05, "h": False, "a": True}, "Титов": {"m": 0.85, "h": True, "a": True}
+        }
+        self.dist_menu = QComboBox()
+        self.dist_menu.addItems(self.districts_db.keys())
+        b2_layout.addWidget(QLabel("Ауданды таңдаңыз:"));
+        b2_layout.addWidget(self.dist_menu)
 
-        ctk.CTkLabel(self.sidebar, text="Жөндеу деңгейі:").pack(pady=(10, 0))
-        self.repair_menu = ctk.CTkOptionMenu(self.sidebar, values=["Черновой", "Орташа", "Еуро"])
-        self.repair_menu.set("Орташа");
-        self.repair_menu.pack(pady=5, padx=20)
+        # Динамикалық бөлім
+        self.dyn_stack = QFrame()
+        dyn_lay = QVBoxLayout(self.dyn_stack)
+        self.f_slider = QSlider(Qt.Orientation.Horizontal);
+        self.f_slider.setRange(1, 5);
+        self.f_slider.setValue(3)
+        self.f_lbl = QLabel("Пәтер қабаты: 3")
+        self.f_slider.valueChanged.connect(lambda v: self.f_lbl.setText(f"Пәтер қабаты: {v}"))
+        self.l_slider = QSlider(Qt.Orientation.Horizontal);
+        self.l_slider.setRange(1, 20);
+        self.l_slider.setValue(6)
+        self.l_lbl = QLabel("Жер көлемі: 6 сотка")
+        self.l_slider.valueChanged.connect(lambda v: self.l_lbl.setText(f"Жер көлемі: {v} сотка"))
+        dyn_lay.addWidget(self.f_lbl);
+        dyn_lay.addWidget(self.f_slider)
+        dyn_lay.addWidget(self.l_lbl);
+        dyn_lay.addWidget(self.l_slider)
+        self.l_lbl.hide();
+        self.l_slider.hide();
+        b2_layout.addWidget(self.dyn_stack)
 
-        self.income_entry = ctk.CTkEntry(self.sidebar, placeholder_text="Айлық табыс (₸)")
-        self.income_entry.insert(0, "650000");
-        self.income_entry.pack(pady=15, padx=20)
+        self.shock_slider = QSlider(Qt.Orientation.Horizontal)
+        self.shock_slider.setRange(400, 850);
+        self.shock_slider.setValue(450)
+        self.shock_lbl = QLabel("Болжамды курс: 450 ₸")
+        self.shock_slider.valueChanged.connect(lambda v: self.shock_lbl.setText(f"Болжамды курс: {v} ₸"))
+        b2_layout.addWidget(self.shock_lbl);
+        b2_layout.addWidget(self.shock_slider)
 
-        self.calc_btn = ctk.CTkButton(self.sidebar, text="ЕСЕПТЕУ", font=ctk.CTkFont(weight="bold"),
-                                      command=self.calculate, fg_color="#00d4ff", text_color="black")
-        self.calc_btn.pack(pady=10, padx=20)
+        self.income_input = QLineEdit("650000")
+        b2_layout.addWidget(QLabel("Айлық табыс (₸):"));
+        b2_layout.addWidget(self.income_input)
 
-        # --- ОҢ ЖАҚ ПАНЕЛЬ ---
-        self.main_frame = ctk.CTkFrame(self, corner_radius=15)
-        self.main_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+        content_layout.addWidget(self.block2)
 
-        ctk.CTkLabel(self.main_frame, text="🏙️ Qyzylorda House Prediction model",
-                     font=ctk.CTkFont(size=28, weight="bold"), text_color="#00d4ff").pack(pady=20)
-
-        self.dist_menu = ctk.CTkOptionMenu(self.main_frame, width=400, values=[
-            "Орталық", "Сырдария", "ЖК Мерей", "Сол Жағалау", "Шұғыла",
-            "Микр. Байтерек", "Универсам", "Арай", "Ақмаржан", "Сәулет",
-            "Микр. Мерей", "Титов"
-        ])
-        self.dist_menu.set("Орталық");
-        self.dist_menu.pack(pady=10)
-
-        self.price_label = ctk.CTkLabel(self.main_frame, text="0 ₸", font=ctk.CTkFont(size=60, weight="bold"),
-                                        text_color="#00d4ff")
-        self.price_label.pack(pady=30)
-
-        self.details_box = ctk.CTkTextbox(self.main_frame, width=620, height=300, font=("Consolas", 14),
-                                          corner_radius=10)
-        self.details_box.pack(pady=10, padx=20)
-
-    # --- ФУНКЦИЯЛАР ---
-    def update_rooms_label(self, val):
-        self.rooms_label.configure(text=f"Бөлме саны: {int(val)}")
-
-    def update_dist_label(self, val):
-        self.dist_val_label.configure(text=f"{val:.1f} км")
-
-    def update_floor_label(self, val):
-        self.floor_val_label.configure(text=f"{int(val)}")
-
-    def update_land_label(self, val):
-        self.land_val_label.configure(text=f"{int(val)} сотка")
+        # --- BLOCK 3: НӘТИЖЕ ---
+        self.block3 = QFrame();
+        self.block3.setObjectName("Block")
+        self.block3.setStyleSheet("border: 2px solid #00d4ff; background-color: #1a1c23;")
+        b3_layout = QVBoxLayout(self.block3)
+        b3_layout.addWidget(QLabel("🎯 ЕСЕПТЕУ НӘТИЖЕСІ", alignment=Qt.AlignmentFlag.AlignCenter))
+        self.price_val = QLabel("0 ₸");
+        self.price_val.setObjectName("Price")
+        self.price_val.setAlignment(Qt.AlignmentFlag.AlignCenter);
+        b3_layout.addWidget(self.price_val)
+        self.inf_lbl = QLabel("+0% инфляция", alignment=Qt.AlignmentFlag.AlignCenter)
+        self.inf_lbl.setStyleSheet("color: #ff4b4b; font-weight: bold; font-size: 16px;");
+        b3_layout.addWidget(self.inf_lbl)
+        self.calc_btn = QPushButton("АНАЛИЗ ЖАСАУ");
+        self.calc_btn.clicked.connect(self.calculate);
+        b3_layout.addWidget(self.calc_btn)
+        self.report = QTextEdit();
+        self.report.setReadOnly(True)
+        self.report.setStyleSheet("background-color: #0d1117; border: none; font-family: 'Consolas';");
+        b3_layout.addWidget(self.report)
+        content_layout.addWidget(self.block3)
 
     def toggle_ui(self):
-        if self.is_house_var.get():
-            self.floor_label_title.pack_forget();
-            self.floor_val_label.pack_forget();
-            self.floor_slider.pack_forget()
-            self.land_label_title.pack();
-            self.land_val_label.pack();
-            self.land_slider.pack(padx=20)
-        else:
-            self.land_label_title.pack_forget();
-            self.land_val_label.pack_forget();
-            self.land_slider.pack_forget()
-            self.floor_label_title.pack();
-            self.floor_val_label.pack();
-            self.floor_slider.pack(padx=20)
+        is_h = self.is_house.isChecked()
+        self.f_lbl.setVisible(not is_h);
+        self.f_slider.setVisible(not is_h)
+        self.l_lbl.setVisible(is_h);
+        self.l_slider.setVisible(is_h)
 
     def calculate(self):
-        districts_db = {
-            "Орталық": {"mult": 1.35, "house": False, "apt": True},
-            "Сырдария": {"mult": 1.28, "house": False, "apt": True},
-            "ЖК Мерей": {"mult": 1.30, "house": False, "apt": True},
-            "Сол Жағалау": {"mult": 1.32, "house": False, "apt": True},
-            "Шұғыла": {"mult": 1.18, "house": True, "apt": True},
-            "Микр. Байтерек": {"mult": 1.10, "house": False, "apt": True},
-            "Универсам": {"mult": 1.12, "house": True, "apt": True},
-            "Арай": {"mult": 1.15, "house": True, "apt": True},
-            "Ақмаржан": {"mult": 1.08, "house": False, "apt": True},
-            "Сәулет": {"mult": 0.98, "house": False, "apt": True},
-            "Микр. Мерей": {"mult": 1.05, "house": False, "apt": True},
-            "Титов": {"mult": 0.85, "house": True, "apt": True}
-        }
-
         try:
-            selected_d = self.dist_menu.get();
-            is_house = self.is_house_var.get();
-            info = districts_db[selected_d]
-            if is_house and not info["house"]: messagebox.showwarning("Ескерту",
-                                                                      f"{selected_d} ауданында жер үйлер жоқ!"); return
-            if not is_house and not info["apt"]: messagebox.showwarning("Ескерту",
-                                                                        f"{selected_d} ауданында этаж үйлер жоқ!"); return
-
-            # Инфрақұрылым бонусы
-            infra_bonus = 1.0
-            if self.infra_school.get(): infra_bonus += 0.05
-            if self.infra_shop.get(): infra_bonus += 0.03
-            if self.infra_park.get(): infra_bonus += 0.04
-
-            area = float(self.area_entry.get());
-            income_val = float(self.income_entry.get());
-            dist_center = self.dist_slider.get()
-            USD_KZT = 380;
-            MULTIPLIER = 0.8;
-            QYZ_INDEX = 0.4
-            repair_map = {"Черновой": 0.8, "Орташа": 1.0, "Еуро": 1.3}
-            mat_map = {"Кирпич": 1.15, "Панель": 0.95, "Бетон": 1.10}
-
-            mat_mult = mat_map[self.material_menu.get()];
-            r_mult = repair_map[self.repair_menu.get()]
-            d_mult = info["mult"];
-            dist_km_mult = 1.0 - (dist_center * 0.02)
-            f_impact = 1.1 if (not is_house and int(self.floor_slider.get()) in [2, 3, 4]) else 0.9
-
-            med_inc = (income_val * 12) / USD_KZT / 10000
-            inp = pd.DataFrame({'MedInc': [med_inc], 'HouseAge': [15], 'AveRooms': [area / 25], 'AveBedrms': [1.2],
+            sel_d = self.dist_menu.currentText();
+            info = self.districts_db[sel_d];
+            is_h = self.is_house.isChecked()
+            if is_h and not info["h"]: self.report.setText(f"❌ {sel_d} ауданында ЖЕР ҮЙ жоқ!"); return
+            if not is_h and not info["a"]: self.report.setText(f"❌ {sel_d} ауданында ПӘТЕР жоқ!"); return
+            area = float(self.area_input.text());
+            USD = 450;
+            MULT = 0.6;
+            QYZ = 0.4
+            future_usd = self.shock_slider.value()
+            mat_m = {"Кирпич": 1.15, "Панель": 0.95, "Бетон": 1.10}[self.mat_menu.currentText()]
+            rep_m = {"Черновой": 0.8, "Орташа": 1.0, "Еуро": 1.3}[self.rep_menu.currentText()]
+            f_imp = 1.15 if (not is_h and self.f_slider.value() in [2, 3, 4]) else 0.9
+            med_inc = (float(self.income_input.text()) * 12) / USD / 10000
+            inp = pd.DataFrame({'MedInc': [med_inc], 'HouseAge': [20], 'AveRooms': [area / 25], 'AveBedrms': [1.2],
                                 'Population': [1500], 'AveOccup': [3.5], 'Latitude': [34.0], 'Longitude': [-118.0]})
-
             raw_p = self.model.predict(inp)[0]
-            price = raw_p * 100000 * USD_KZT * MULTIPLIER * d_mult * QYZ_INDEX * r_mult * f_impact * mat_mult * dist_km_mult * infra_bonus
-
-            if is_house: price += (self.land_slider.get() * 1500000)
-
-            self.price_label.configure(text=f"{int(price):,} ₸")
-            self.details_box.delete("0.0", "end")
-            report = f""">>> САРАПТАМАЛЫҚ ҚОРЫТЫНДЫ:
-------------------------------------------
-Аудан:        {selected_d}
-Мүлік түрі:   {'Жер үй' if is_house else 'Пәтер'}
-Орталықтан:   {dist_center:.1f} км
-Инфрақұрылым: +{int((infra_bonus - 1) * 100)}% бонус
-1 м2 құны:    {int(price / area):,} ₸
-------------------------------------------
-MadCompany | Qyzylorda 2026"""
-            self.details_box.insert("0.0", report)
-
+            p_base = raw_p * 100000 * USD * MULT * info["m"] * QYZ * f_imp * mat_m * rep_m
+            p_shock = raw_p * 100000 * future_usd * MULT * info["m"] * QYZ * f_imp * mat_m * rep_m
+            if is_h: p_base += (self.l_slider.value() * 1500000); p_shock += (self.l_slider.value() * 1500000)
+            inf_perc = ((p_shock - p_base) / p_base) * 100
+            self.price_val.setText(f"{int(p_shock):,} ₸")
+            self.inf_lbl.setText(f"+{int(inf_perc)}% инфляция")
+            self.report.setText(
+                f"AI САРАПТАМА:\nАудан: {sel_d}\nТүрі: {'Жер үй' if is_h else 'Пәтер'}\n1 м2 құны: {int(p_shock / area):,} ₸")
         except Exception as e:
-            messagebox.showerror("Қате", f"Деректерді тексеріңіз! {e}")
+            self.report.setText(f"Қате: {e}")
 
 
 if __name__ == "__main__":
-    app = QyzylordaAIApp()
-    app.mainloop()
+    app = QApplication(sys.argv);
+    window = QyzylordaAIApp();
+    window.show();
+    sys.exit(app.exec())
