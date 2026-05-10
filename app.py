@@ -13,7 +13,7 @@ class QyzylordaAIApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Qyzylorda House Price Prediction Model")
-        self.setMinimumSize(1000, 750)
+        self.setMinimumSize(1100, 800)
 
         # Модельді жүктеу
         try:
@@ -93,11 +93,11 @@ class QyzylordaAIApp(QMainWindow):
 
         content_layout.addWidget(self.block1)
 
-        # --- BLOCK 2: ЛОКАЦИЯ ЖӘНЕ ЭКОНОМИКА ---
+        # --- BLOCK 2: ЛОКАЦИЯ ЖӘНЕ ИНФРАҚҰРЫЛЫМ ---
         self.block2 = QFrame();
         self.block2.setObjectName("Block")
         b2_layout = QVBoxLayout(self.block2)
-        b2_layout.addWidget(QLabel("📍 ЛОКАЦИЯ ЖӘНЕ ВАЛЮТА", font=QFont("Arial", 12, QFont.Weight.Bold)))
+        b2_layout.addWidget(QLabel("📍 ЛОКАЦИЯ ЖӘНЕ ИНФРА", font=QFont("Arial", 12, QFont.Weight.Bold)))
 
         self.districts_db = {
             "Орталық": {"m": 1.35, "h": False, "a": True}, "Сырдария": {"m": 1.28, "h": False, "a": True},
@@ -111,6 +111,15 @@ class QyzylordaAIApp(QMainWindow):
         self.dist_menu.addItems(self.districts_db.keys())
         b2_layout.addWidget(QLabel("Ауданды таңдаңыз:"));
         b2_layout.addWidget(self.dist_menu)
+
+        # --- ЖАҢА: ИНФРАҚҰРЫЛЫМ БӨЛІМІ ---
+        b2_layout.addWidget(QLabel("🏥 ИНФРАҚҰРЫЛЫМ (Жақын жерде):"))
+        self.inf_school = QCheckBox("Мектеп / Балабақша")
+        self.inf_shop = QCheckBox("Супермаркеттер")
+        self.inf_park = QCheckBox("Саябақ / Парк")
+        b2_layout.addWidget(self.inf_school)
+        b2_layout.addWidget(self.inf_shop)
+        b2_layout.addWidget(self.inf_park)
 
         # Динамикалық бөлім
         self.dyn_stack = QFrame()
@@ -141,7 +150,7 @@ class QyzylordaAIApp(QMainWindow):
         b2_layout.addWidget(self.shock_lbl);
         b2_layout.addWidget(self.shock_slider)
 
-        self.income_input = QLineEdit("650000")
+        self.income_input = QLineEdit("500000")
         b2_layout.addWidget(QLabel("Айлық табыс (₸):"));
         b2_layout.addWidget(self.income_input)
 
@@ -183,26 +192,39 @@ class QyzylordaAIApp(QMainWindow):
             is_h = self.is_house.isChecked()
             if is_h and not info["h"]: self.report.setText(f"❌ {sel_d} ауданында ЖЕР ҮЙ жоқ!"); return
             if not is_h and not info["a"]: self.report.setText(f"❌ {sel_d} ауданында ПӘТЕР жоқ!"); return
+
+            # ИНФРАҚҰРЫЛЫМ
+            infra_bonus = 1.0
+            if self.inf_school.isChecked(): infra_bonus += 0.02
+            if self.inf_shop.isChecked(): infra_bonus += 0.01
+            if self.inf_park.isChecked(): infra_bonus += 0.03
+
             area = float(self.area_input.text());
             USD = 450;
-            MULT = 0.6;
+            MULT = 0.5;
             QYZ = 0.4
             future_usd = self.shock_slider.value()
             mat_m = {"Кирпич": 1.15, "Панель": 0.95, "Бетон": 1.10}[self.mat_menu.currentText()]
             rep_m = {"Черновой": 0.8, "Орташа": 1.0, "Еуро": 1.3}[self.rep_menu.currentText()]
-            f_imp = 1.15 if (not is_h and self.f_slider.value() in [2, 3, 4]) else 0.9
+            floor_map = {1: 0.90, 2: 1.10, 3: 1.15, 4: 1.08, 5: 0.85}
+            f_imp = floor_map.get(self.f_slider.value(), 1.0) if not is_h else 1.0
             med_inc = (float(self.income_input.text()) * 12) / USD / 10000
             inp = pd.DataFrame({'MedInc': [med_inc], 'HouseAge': [20], 'AveRooms': [area / 25], 'AveBedrms': [1.2],
                                 'Population': [1500], 'AveOccup': [3.5], 'Latitude': [34.0], 'Longitude': [-118.0]})
             raw_p = self.model.predict(inp)[0]
-            p_base = raw_p * 100000 * USD * MULT * info["m"] * QYZ * f_imp * mat_m * rep_m
-            p_shock = raw_p * 100000 * future_usd * MULT * info["m"] * QYZ * f_imp * mat_m * rep_m
+
+            # Инфрақұрылым бонусын бағаға қолдану
+            p_base = raw_p * 100000 * USD * MULT * info["m"] * QYZ * f_imp * mat_m * rep_m * infra_bonus
+            p_shock = raw_p * 100000 * future_usd * MULT * info["m"] * QYZ * f_imp * mat_m * rep_m * infra_bonus
+
             if is_h: p_base += (self.l_slider.value() * 1500000); p_shock += (self.l_slider.value() * 1500000)
             inf_perc = ((p_shock - p_base) / p_base) * 100
             self.price_val.setText(f"{int(p_shock):,} ₸")
             self.inf_lbl.setText(f"+{int(inf_perc)}% инфляция")
             self.report.setText(
-                f"AI САРАПТАМА:\nАудан: {sel_d}\nТүрі: {'Жер үй' if is_h else 'Пәтер'}\n1 м2 құны: {int(p_shock / area):,} ₸")
+                f"\nАудан: {sel_d}\nТүрі: {'Жер үй' if is_h else 'Пәтер'}\n"
+                f"1 м2 құны: {int(p_shock / area):,} ₸\n"
+                f"Инфра бонус: +{int((infra_bonus - 1) * 100)}%")
         except Exception as e:
             self.report.setText(f"Қате: {e}")
 
