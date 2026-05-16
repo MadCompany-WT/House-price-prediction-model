@@ -3,7 +3,6 @@ import pandas as pd
 import joblib
 import plotly.express as px
 import numpy as np
-from PIL import Image
 import requests
 from io import BytesIO
 import base64
@@ -130,7 +129,7 @@ st.markdown("""
 @st.cache_resource
 def load_all():
     model = joblib.load('models/house_price_model.pkl')
-    # Егер metrics.pkl болмаса, қолмен жазамыз
+    # Егер metrics.pkl болмаса, қолмен жазамыс
     try:
         metrics = joblib.load('models/metrics.pkl')
     except:
@@ -166,18 +165,21 @@ with st.sidebar:
 
 # 3. ЕСЕПТЕУ ЛОГИКАСЫ (СЕНІҢ КОЭФФИЦИЕНТТЕРІҢ)
 def get_price(usd_rate, dist_mult=1.0):
-    USD = 450;
-    MULT = 0.5;
+    USD = 450
+    MULT = 0.5
     QYZ = 0.4  # Сенің нақты коэф-терің
 
     mat_map = {"Кирпич": 1.15, "Панель": 0.95, "Бетон": 1.10}
     rep_map = {"Черновой": 0.8, "Орташа": 1.0, "Еуро": 1.3}
 
-    # Инфрақұрылым бонустары (PyQt6-дан алынды)
+    # Инфрақұрылым бонустары
     infra_bonus = 1.0
-    if inf_sch: infra_bonus += 0.02
-    if inf_shp: infra_bonus += 0.01
-    if inf_prk: infra_bonus += 0.03
+    if inf_sch: 
+        infra_bonus += 0.02
+    if inf_shp: 
+        infra_bonus += 0.01
+    if inf_prk: 
+        infra_bonus += 0.03
 
     med_inc = (income * 12) / USD / 10000
     inp = pd.DataFrame({'MedInc': [med_inc], 'HouseAge': [age], 'AveRooms': [area / 25], 'AveBedrms': [1.2],
@@ -196,12 +198,18 @@ def get_price(usd_rate, dist_mult=1.0):
 
 # 4. АУДАНДАР ТІЗІМІ
 districts = {
-    "Орталық": {"m": 1.35, "h": False, "a": True}, "Сырдария": {"m": 1.28, "h": False, "a": True},
-    "ЖК Мерей": {"m": 1.30, "h": False, "a": True}, "Сол Жағалау": {"m": 1.32, "h": False, "a": True},
-    "Шұғыла": {"m": 1.18, "h": True, "a": True}, "Микр. Байтерек": {"m": 1.10, "h": False, "a": True},
-    "Универсам": {"m": 1.12, "h": False, "a": True}, "Арай": {"m": 1.15, "h": True, "a": True},
-    "Ақмаржан": {"m": 1.08, "h": False, "a": True}, "Сәулет": {"m": 0.98, "h": False, "a": True},
-    "Микр. Мерей": {"m": 1.05, "h": False, "a": True}, "Титов": {"m": 0.85, "h": True, "a": True}
+    "Орталық": {"m": 1.35, "h": False, "a": True}, 
+    "Сырдария": {"m": 1.28, "h": False, "a": True},
+    "ЖК Мерей": {"m": 1.30, "h": False, "a": True}, 
+    "Сол Жағалау": {"m": 1.32, "h": False, "a": True},
+    "Шұғыла": {"m": 1.18, "h": True, "a": True}, 
+    "Микр. Байтерек": {"m": 1.10, "h": False, "a": True},
+    "Универсам": {"m": 1.12, "h": False, "a": True}, 
+    "Арай": {"m": 1.15, "h": True, "a": True},
+    "Ақмаржан": {"m": 1.08, "h": False, "a": True}, 
+    "Сәулет": {"m": 0.98, "h": False, "a": True},
+    "Микр. Мерей": {"m": 1.05, "h": False, "a": True}, 
+    "Титов": {"m": 0.85, "h": True, "a": True}
 }
 
 # 5. НЕГІЗГІ БЕТ (GUI)
