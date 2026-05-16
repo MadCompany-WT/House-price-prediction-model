@@ -3,19 +3,126 @@ import pandas as pd
 import joblib
 import plotly.express as px
 import numpy as np
+from PIL import Image
+import requests
+from io import BytesIO
+import base64
 
 # 1. Бет баптаулары мен Дизайн (Dark Mode)
 st.set_page_config(page_title="AI Qyzylorda Web Analytics", page_icon="🌐", layout="wide")
 
+# Фон арқылы ресімдерді қосамыз
+def get_background_image(is_house):
+    if is_house:
+        # Жеке үй (коттедж) фонды
+        bg_url = "https://images.unsplash.com/photo-1570129477492-45a003537e1f?w=1600&h=900&fit=crop"
+    else:
+        # Пәтер ғимараты фонды
+        bg_url = "https://images.unsplash.com/photo-1545324418-cc1a9d6faf4f?w=1600&h=900&fit=crop"
+    
+    try:
+        response = requests.get(bg_url, timeout=5)
+        if response.status_code == 200:
+            return base64.b64encode(response.content).decode()
+    except:
+        return None
+    return None
+
+# Получаем фон в зависимости от выбора
+@st.cache_data(ttl=3600)
+def get_bg_style(is_house):
+    bg_b64 = get_background_image(is_house)
+    if bg_b64:
+        return f"url(data:image/jpeg;base64,{bg_b64})"
+    return None
+
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    div[data-testid="stVerticalBlock"] > div:has(div.stMetric) {
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 20px; border-radius: 18px; backdrop-filter: blur(10px);
+    .stApp {
+        background-attachment: fixed;
+        background-size: cover;
+        background-position: center;
     }
-    h1, h2, h3 { color: #00d4ff !important; font-family: 'Inter', sans-serif; }
+    
+    .main-container {
+        background: rgba(14, 17, 23, 0.92);
+        backdrop-filter: blur(15px);
+        border-radius: 20px;
+        padding: 30px;
+        margin: 20px 0;
+    }
+    
+    .main { 
+        background: linear-gradient(135deg, rgba(14, 17, 23, 0.95) 0%, rgba(20, 30, 50, 0.95) 100%);
+    }
+    
+    div[data-testid="stVerticalBlock"] > div:has(div.stMetric) {
+        background: rgba(0, 212, 255, 0.08);
+        border: 2px solid rgba(0, 212, 255, 0.3);
+        padding: 20px; 
+        border-radius: 18px; 
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0, 212, 255, 0.1);
+        transition: all 0.3s ease;
+    }
+    
+    div[data-testid="stVerticalBlock"] > div:has(div.stMetric):hover {
+        background: rgba(0, 212, 255, 0.12);
+        border: 2px solid rgba(0, 212, 255, 0.5);
+        box-shadow: 0 12px 48px rgba(0, 212, 255, 0.2);
+    }
+    
+    h1 { 
+        color: #00d4ff !important; 
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+        margin-bottom: 30px;
+    }
+    
+    h2, h3 { 
+        color: #00d4ff !important; 
+        font-family: 'Inter', sans-serif;
+        text-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    }
+    
+    .stTabs [data-baseweb="tab-list"] button {
+        color: #00d4ff !important;
+        font-weight: 600;
+        border-bottom: 3px solid transparent;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        border-bottom: 3px solid #00d4ff !important;
+        background: rgba(0, 212, 255, 0.1);
+    }
+    
+    .metric-card {
+        background: rgba(0, 212, 255, 0.08) !important;
+        border: 2px solid rgba(0, 212, 255, 0.3) !important;
+        border-radius: 15px !important;
+        padding: 15px !important;
+        box-shadow: 0 8px 32px rgba(0, 212, 255, 0.1) !important;
+    }
+    
+    .stCheckbox, .stRadio, .stSelectbox, .stSlider {
+        color: #ffffff !important;
+    }
+    
+    .stSidebar {
+        background: rgba(14, 17, 23, 0.95) !important;
+        border-right: 2px solid rgba(0, 212, 255, 0.2) !important;
+    }
+    
+    .stDivider {
+        border-color: rgba(0, 212, 255, 0.3) !important;
+    }
+    
+    .stCaption {
+        color: rgba(255, 255, 255, 0.6) !important;
+        text-align: center;
+        margin-top: 40px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -98,7 +205,26 @@ districts = {
 }
 
 # 5. НЕГІЗГІ БЕТ (GUI)
+# Динамический фон в зависимости от выбора
+bg_style = get_bg_style(is_house)
+if bg_style:
+    st.markdown(f"""
+    <style>
+    .stApp {{
+        background-image: {bg_style};
+        background-attachment: fixed;
+        background-size: cover;
+        background-position: center;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
 st.title("🏙️ Qyzylorda Property Intelligence (Web Edition)")
+
+if is_house:
+    st.markdown("### 🏡 *Режим: Жеке үйлер (коттеджи)*")
+else:
+    st.markdown("### 🏢 *Режим: Пәтерлер (квартиры)*")
 
 tab1, tab2, tab3 = st.tabs(["🎯 Нарықтық Болжам", "🧠 ML Аналитика", "📂 Кадастр"])
 
