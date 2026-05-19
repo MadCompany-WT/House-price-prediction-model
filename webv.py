@@ -3,6 +3,10 @@ from pathlib import Path
 import joblib
 import pandas as pd
 import plotly.express as px
+import numpy as np
+import requests
+from io import BytesIO
+import base64
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -12,6 +16,32 @@ MODEL_PATH = ROOT / "models" / "house_price_model.pkl"
 METRICS_PATH = ROOT / "models" / "metrics.pkl"
 RESULT_PLOT_PATH = ROOT / "result_plot.png"
 
+# Фон арқылы ресімдерді қосамыз
+def get_background_image(is_house):
+    if is_house:
+        # Жеке үй (коттедж) фонды
+        bg_url = "https://images.unsplash.com/photo-1570129477492-45a003537e1f?w=1600&h=900&fit=crop"
+    else:
+        # Пәтер ғимараты фонды
+        bg_url = "https://images.unsplash.com/photo-1545324418-cc1a9d6faf4f?w=1600&h=900&fit=crop"
+
+    try:
+        response = requests.get(bg_url, timeout=5)
+        if response.status_code == 200:
+            return base64.b64encode(response.content).decode()
+    except:
+        return None
+    return None
+
+# Получаем фон в зависимости от выбора
+@st.cache_data(ttl=3600)
+def get_bg_style(is_house):
+    bg_b64 = get_background_image(is_house)
+    if bg_b64:
+        return f"url(data:image/jpeg;base64,{bg_b64})"
+    return None
+
+st.markdown("""
 BASE_USD_RATE = 450
 CALIFORNIA_TO_QYZYLORDA = 0.4
 MARKET_SCALE = 0.5
@@ -64,6 +94,71 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    .stApp {
+        background-attachment: fixed;
+        background-size: cover;
+        background-position: center;
+    }
+
+    .main-container {
+        background: rgba(14, 17, 23, 0.92);
+        backdrop-filter: blur(15px);
+        border-radius: 20px;
+        padding: 30px;
+        margin: 20px 0;
+    }
+
+    .main {
+        background: linear-gradient(135deg, rgba(14, 17, 23, 0.95) 0%, rgba(20, 30, 50, 0.95) 100%);
+    }
+
+    div[data-testid="stVerticalBlock"] > div:has(div.stMetric) {
+        background: rgba(0, 212, 255, 0.08);
+        border: 2px solid rgba(0, 212, 255, 0.3);
+        padding: 20px;
+        border-radius: 18px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0, 212, 255, 0.1);
+        transition: all 0.3s ease;
+    }
+
+    div[data-testid="stVerticalBlock"] > div:has(div.stMetric):hover {
+        background: rgba(0, 212, 255, 0.12);
+        border: 2px solid rgba(0, 212, 255, 0.5);
+        box-shadow: 0 12px 48px rgba(0, 212, 255, 0.2);
+    }
+
+    h1 {
+        color: #00d4ff !important;
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+        margin-bottom: 30px;
+    }
+
+    h2, h3 {
+        color: #00d4ff !important;
+        font-family: 'Inter', sans-serif;
+        text-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    }
+
+    .stTabs [data-baseweb="tab-list"] button {
+        color: #00d4ff !important;
+        font-weight: 600;
+        border-bottom: 3px solid transparent;
+    }
+
+    .stTabs [aria-selected="true"] {
+        border-bottom: 3px solid #00d4ff !important;
+        background: rgba(0, 212, 255, 0.1);
+    }
+
+    .metric-card {
+        background: rgba(0, 212, 255, 0.08) !important;
+        border: 2px solid rgba(0, 212, 255, 0.3) !important;
+        border-radius: 15px !important;
+        padding: 15px !important;
+        box-shadow: 0 8px 32px rgba(0, 212, 255, 0.1) !important;
     :root {
         --paper: #f7f3ec;
         --surface: #ffffff;
@@ -238,6 +333,25 @@ st.markdown(
         border-top: 3px solid var(--teal);
     }
 
+    .stCheckbox, .stRadio, .stSelectbox, .stSlider {
+        color: #ffffff !important;
+    }
+
+    .stSidebar {
+        background: rgba(14, 17, 23, 0.95) !important;
+        border-right: 2px solid rgba(0, 212, 255, 0.2) !important;
+    }
+
+    .stDivider {
+        border-color: rgba(0, 212, 255, 0.3) !important;
+    }
+
+    .stCaption {
+        color: rgba(255, 255, 255, 0.6) !important;
+        text-align: center;
+        margin-top: 40px;
+    }
+
     button[kind="primary"] {
         background: var(--teal) !important;
         border: 1px solid var(--teal) !important;
@@ -258,6 +372,14 @@ st.markdown(
 
 
 @st.cache_resource
+def load_all():
+    model = joblib.load('models/house_price_model.pkl')
+    # Егер metrics.pkl болмаса, қолмен жазамыс
+    try:
+        metrics = joblib.load('models/metrics.pkl')
+    except:
+        metrics = {"r2": 0.812}
+    return model, metrics
 def load_model():
     return joblib.load(MODEL_PATH)
 
@@ -362,6 +484,90 @@ with st.sidebar:
     repair = st.selectbox("Состояние ремонта", list(REPAIRS.keys()), index=1)
 
     st.divider()
+    income = st.number_input("📈 Айлық табыс (₸)", value=500000)
+
+
+# 3. ЕСЕПТЕУ ЛОГИКАСЫ (СЕНІҢ КОЭФФИЦИЕНТТЕРІҢ)
+def get_price(usd_rate, dist_mult=1.0):
+    USD = 450
+    MULT = 0.5
+    QYZ = 0.4  # Сенің нақты коэф-терің
+
+    mat_map = {"Кирпич": 1.15, "Панель": 0.95, "Бетон": 1.10}
+    rep_map = {"Черновой": 0.8, "Орташа": 1.0, "Еуро": 1.3}
+
+    # Инфрақұрылым бонустары
+    infra_bonus = 1.0
+    if inf_sch: 
+        infra_bonus += 0.02
+    if inf_shp: 
+        infra_bonus += 0.01
+    if inf_prk: 
+        infra_bonus += 0.03
+
+    med_inc = (income * 12) / USD / 10000
+    inp = pd.DataFrame({'MedInc': [med_inc], 'HouseAge': [age], 'AveRooms': [area / 25], 'AveBedrms': [1.2],
+                        'Population': [1500], 'AveOccup': [3.5], 'Latitude': [34.0], 'Longitude': [-118.0]})
+
+    raw_pred = model.predict(inp)[0]
+
+    # Негізгі формула
+    price = raw_pred * 100000 * usd_rate * MULT * dist_mult * QYZ * rep_map[repair] * mat_map[
+        material] * floor_impact * infra_bonus
+
+    if is_house:
+        price += (land_sotka * 1500000)
+    return int(price)
+
+
+# 4. АУДАНДАР ТІЗІМІ
+districts = {
+    "Орталық": {"m": 1.35, "h": False, "a": True}, 
+    "Сырдария": {"m": 1.28, "h": False, "a": True},
+    "ЖК Мерей": {"m": 1.30, "h": False, "a": True}, 
+    "Сол Жағалау": {"m": 1.32, "h": False, "a": True},
+    "Шұғыла": {"m": 1.18, "h": True, "a": True}, 
+    "Микр. Байтерек": {"m": 1.10, "h": False, "a": True},
+    "Универсам": {"m": 1.12, "h": False, "a": True}, 
+    "Арай": {"m": 1.15, "h": True, "a": True},
+    "Ақмаржан": {"m": 1.08, "h": False, "a": True}, 
+    "Сәулет": {"m": 0.98, "h": False, "a": True},
+    "Микр. Мерей": {"m": 1.05, "h": False, "a": True}, 
+    "Титов": {"m": 0.85, "h": True, "a": True}
+}
+
+# 5. НЕГІЗГІ БЕТ (GUI)
+# Динамический фон в зависимости от выбора
+bg_style = get_bg_style(is_house)
+if bg_style:
+    st.markdown(f"""
+    <style>
+    .stApp {{
+        background-image: {bg_style};
+        background-attachment: fixed;
+        background-size: cover;
+        background-position: center;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
+st.title("🏙️ Qyzylorda Property Intelligence (Web Edition)")
+
+if is_house:
+    st.markdown("### 🏡 *Режим: Жеке үйлер (коттеджи)*")
+else:
+    st.markdown("### 🏢 *Режим: Пәтерлер (квартиры)*")
+
+tab1, tab2, tab3 = st.tabs(["🎯 Нарықтық Болжам", "🧠 ML Аналитика", "📂 Кадастр"])
+
+with tab1:
+    col_map1, col_map2 = st.columns([2, 1])
+
+    with col_map2:
+        st.subheader("🏥 Инфрақұрылым")
+        inf_sch = st.checkbox("Мектеп / Балабақша")
+        inf_shp = st.checkbox("Супермаркеттер")
+        inf_prk = st.checkbox("Саябақ / Парк")
     has_school = st.checkbox("Рядом школа или детский сад", value=True)
     has_shop = st.checkbox("Рядом магазины", value=True)
     has_park = st.checkbox("Рядом парк или зона отдыха")
@@ -590,6 +796,8 @@ with tab_districts:
     view_df["Прогноз"] = view_df["Прогноз"].map(format_kzt)
     view_df["Цена за м²"] = view_df["Цена за м²"].map(format_kzt)
     st.dataframe(view_df, width="stretch", hide_index=True)
+
+st.caption("MadCompany | Qyzylorda AI Intelligence 2026")
 
 with tab_model:
     st.subheader("ML-часть проекта")
