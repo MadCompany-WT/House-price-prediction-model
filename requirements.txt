@@ -5,3 +5,4 @@ joblib
 matplotlib
 PyQt6
 streamlit
+plotly

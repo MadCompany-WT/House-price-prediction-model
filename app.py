@@ -15,13 +15,11 @@ class QyzylordaAIApp(QMainWindow):
         self.setWindowTitle("Qyzylorda House Price Prediction Model")
         self.setMinimumSize(1100, 800)
 
-        # Модельді жүктеу
         try:
             self.model = joblib.load('models/house_price_model.pkl')
         except:
             print("Модель файлы табылмады!")
 
-        # СТИЛЬ (Modern Dark UI)
         self.setStyleSheet("""
             QMainWindow { background-color: #0e1117; }
             QFrame#Block { 
@@ -49,7 +47,6 @@ class QyzylordaAIApp(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
-        # HEADER
         header_lbl = QLabel("🏙️ Qyzylorda House Price Prediction Model")
         header_lbl.setObjectName("Header")
         header_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -58,7 +55,7 @@ class QyzylordaAIApp(QMainWindow):
         content_layout = QHBoxLayout()
         main_layout.addLayout(content_layout)
 
-        # --- BLOCK 1: ПАРАМЕТРЛЕР ---
+
         self.block1 = QFrame();
         self.block1.setObjectName("Block")
         b1_layout = QVBoxLayout(self.block1)
@@ -93,7 +90,6 @@ class QyzylordaAIApp(QMainWindow):
 
         content_layout.addWidget(self.block1)
 
-        # --- BLOCK 2: ЛОКАЦИЯ ЖӘНЕ ИНФРАҚҰРЫЛЫМ ---
         self.block2 = QFrame();
         self.block2.setObjectName("Block")
         b2_layout = QVBoxLayout(self.block2)
@@ -112,7 +108,7 @@ class QyzylordaAIApp(QMainWindow):
         b2_layout.addWidget(QLabel("Ауданды таңдаңыз:"));
         b2_layout.addWidget(self.dist_menu)
 
-        # --- ЖАҢА: ИНФРАҚҰРЫЛЫМ БӨЛІМІ ---
+
         b2_layout.addWidget(QLabel("🏥 ИНФРАҚҰРЫЛЫМ (Жақын жерде):"))
         self.inf_school = QCheckBox("Мектеп / Балабақша")
         self.inf_shop = QCheckBox("Супермаркеттер")
@@ -121,7 +117,6 @@ class QyzylordaAIApp(QMainWindow):
         b2_layout.addWidget(self.inf_shop)
         b2_layout.addWidget(self.inf_park)
 
-        # Динамикалық бөлім
         self.dyn_stack = QFrame()
         dyn_lay = QVBoxLayout(self.dyn_stack)
         self.f_slider = QSlider(Qt.Orientation.Horizontal);
@@ -156,7 +151,6 @@ class QyzylordaAIApp(QMainWindow):
 
         content_layout.addWidget(self.block2)
 
-        # --- BLOCK 3: НӘТИЖЕ ---
         self.block3 = QFrame();
         self.block3.setObjectName("Block")
         self.block3.setStyleSheet("border: 2px solid #00d4ff; background-color: #1a1c23;")
@@ -193,7 +187,6 @@ class QyzylordaAIApp(QMainWindow):
             if is_h and not info["h"]: self.report.setText(f"❌ {sel_d} ауданында ЖЕР ҮЙ жоқ!"); return
             if not is_h and not info["a"]: self.report.setText(f"❌ {sel_d} ауданында ПӘТЕР жоқ!"); return
 
-            # ИНФРАҚҰРЫЛЫМ
             infra_bonus = 1.0
             if self.inf_school.isChecked(): infra_bonus += 0.02
             if self.inf_shop.isChecked(): infra_bonus += 0.01
@@ -213,7 +206,6 @@ class QyzylordaAIApp(QMainWindow):
                                 'Population': [1500], 'AveOccup': [3.5], 'Latitude': [34.0], 'Longitude': [-118.0]})
             raw_p = self.model.predict(inp)[0]
 
-            # Инфрақұрылым бонусын бағаға қолдану
             p_base = raw_p * 100000 * USD * MULT * info["m"] * QYZ * f_imp * mat_m * rep_m * infra_bonus
             p_shock = raw_p * 100000 * future_usd * MULT * info["m"] * QYZ * f_imp * mat_m * rep_m * infra_bonus
 

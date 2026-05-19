@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Прогноз цен на жилье в Кызылорде</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-copy">
+            <p class="eyebrow">Random Forest model</p>
+            <h1>Прогноз цен на жилье в Кызылорде</h1>
+            <p>
+                Введите параметры квартиры или частного дома. Сайт рассчитает цену через модель
+                машинного обучения и локальные коэффициенты районов Кызылорды.
+            </p>
+        </div>
+        <div class="header-visual" aria-label="Схема рынка недвижимости Кызылорды">
+            <div class="city-grid">
+                <span class="district-pin pin-center">Центр</span>
+                <span class="district-pin pin-left">Арай</span>
+                <span class="district-pin pin-right">Левый берег</span>
+                <span class="district-pin pin-bottom">Титов</span>
+                <div class="river-line"></div>
+            </div>
+            <div class="model-badge">
+                <span>R² score</span>
+                <strong>__R2_SCORE__%</strong>
+            </div>
+        </div>
+    </header>
+
+    <main class="layout">
+        <section class="control-panel" aria-label="Параметры объекта">
+            <div class="panel-heading">
+                <p class="eyebrow">Параметры</p>
+                <h2>Объект оценки</h2>
+            </div>
+
+            <form id="predictForm">
+                <div class="segmented" role="group" aria-label="Тип жилья">
+                    <label>
+                        <input type="radio" name="objectType" value="apartment" checked>
+                        <span>Квартира</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="objectType" value="house">
+                        <span>Частный дом</span>
+                    </label>
+                </div>
+
+                <label class="field">
+                    <span>Район</span>
+                    <select name="district" id="districtSelect">
+                        <option value="Центр">Центр</option>
+                        <option value="Сырдария">Сырдария</option>
+                        <option value="ЖК Мерей">ЖК Мерей</option>
+                        <option value="Левый берег">Левый берег</option>
+                        <option value="Шұғыла">Шұғыла</option>
+                        <option value="Байтерек">Байтерек</option>
+                        <option value="Универсам">Универсам</option>
+                        <option value="Арай">Арай</option>
+                        <option value="Акмаржан">Акмаржан</option>
+                        <option value="Саулет">Саулет</option>
+                        <option value="Мерей">Мерей</option>
+                        <option value="Титов">Титов</option>
+                    </select>
+                </label>
+
+                <div class="field-grid">
+                    <label class="field">
+                        <span>Площадь, м²</span>
+                        <input name="area" type="number" min="20" max="500" step="5" value="85">
+                    </label>
+                    <label class="field">
+                        <span>Комнат</span>
+                        <input name="rooms" type="number" min="1" max="10" value="3">
+                    </label>
+                </div>
+
+                <div class="field-grid">
+                    <label class="field">
+                        <span>Возраст дома</span>
+                        <input name="age" type="range" min="1" max="60" value="20" data-output="ageValue">
+                        <b id="ageValue">20 лет</b>
+                    </label>
+                    <label class="field floor-field">
+                        <span>Этаж</span>
+                        <select name="floor">
+                            <option value="1">1 этаж</option>
+                            <option value="2">2 этаж</option>
+                            <option value="3" selected>3 этаж</option>
+                            <option value="4">4 этаж</option>
+                            <option value="5">5 этаж</option>
+                        </select>
+                    </label>
+                </div>
+
+                <label class="field land-field hidden">
+                    <span>Земля, соток</span>
+                    <input name="land" type="range" min="1" max="20" value="6" data-output="landValue">
+                    <b id="landValue">6 соток</b>
+                </label>
+
+                <div class="field-grid">
+                    <label class="field">
+                        <span>Материал</span>
+                        <select name="material">
+                            <option value="Кирпич">Кирпич</option>
+                            <option value="Панель">Панель</option>
+                            <option value="Бетон">Бетон</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Ремонт</span>
+                        <select name="repair">
+                            <option value="Черновой">Черновой</option>
+                            <option value="Средний" selected>Средний</option>
+                            <option value="Евроремонт">Евроремонт</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="checks">
+                    <label><input type="checkbox" name="school" checked> Школа или детский сад рядом</label>
+                    <label><input type="checkbox" name="shop" checked> Магазины рядом</label>
+                    <label><input type="checkbox" name="park"> Парк или зона отдыха рядом</label>
+                </div>
+
+                <div class="field-grid">
+                    <label class="field">
+                        <span>Месячный доход, ₸</span>
+                        <input name="income" type="number" min="100000" max="2500000" step="50000" value="500000">
+                    </label>
+                    <label class="field">
+                        <span>Курс доллара, ₸</span>
+                        <input name="usdRate" type="range" min="400" max="850" value="480" data-output="usdValue">
+                        <b id="usdValue">480 ₸</b>
+                    </label>
+                </div>
+            </form>
+        </section>
+
+        <section class="result-area" aria-live="polite">
+            <div class="price-card">
+                <div>
+                    <p class="eyebrow">Прогнозная цена</p>
+                    <h2 id="scenarioPrice">Загрузка...</h2>
+                    <p id="objectSummary">Расчет параметров объекта</p>
+                </div>
+                <div class="price-meta">
+                    <span id="pricePerMeter">- за м²</span>
+                    <span id="deltaPrice">- от курса</span>
+                </div>
+            </div>
+
+            <div class="metric-grid">
+                <article>
+                    <span>Базовая цена</span>
+                    <strong id="currentPrice">-</strong>
+                </article>
+                <article>
+                    <span>Инфраструктура</span>
+                    <strong id="infraMultiplier">-</strong>
+                </article>
+                <article>
+                    <span>Коэф. района</span>
+                    <strong id="districtMultiplier">-</strong>
+                </article>
+                <article>
+                    <span>Земля</span>
+                    <strong id="landPrice">-</strong>
+                </article>
+            </div>
+
+            <section class="card">
+                <div class="section-title">
+                    <p class="eyebrow">Сравнение</p>
+                    <h2>Районы по выбранным параметрам</h2>
+                </div>
+                <div id="districtBars" class="district-bars"></div>
+            </section>
+
+            <section class="model-section">
+                <div class="card">
+                    <div class="section-title">
+                        <p class="eyebrow">ML логика</p>
+                        <h2>Как считается прогноз</h2>
+                    </div>
+                    <div class="formula-list">
+                        <p><span>База модели</span><strong id="rawPrediction">-</strong></p>
+                        <p><span>Материал</span><strong id="materialMultiplier">-</strong></p>
+                        <p><span>Ремонт</span><strong id="repairMultiplier">-</strong></p>
+                        <p><span>Этаж</span><strong id="floorMultiplier">-</strong></p>
+                    </div>
+                    <p class="note">
+                        Модель обучена на California Housing. Затем прогноз переводится в тенге и адаптируется
+                        коэффициентами Кызылорды: район, этаж, ремонт, материал, инфраструктура и земля.
+                    </p>
+                </div>
+                <figure class="training-figure">
+                    <img src="/result-plot.png" alt="График результата обучения модели">
+                    <figcaption>Визуализация результата обучения модели</figcaption>
+                </figure>
+            </section>
+        </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
